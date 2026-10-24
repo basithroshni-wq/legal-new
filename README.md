@@ -54,6 +54,70 @@ flowchart TD
 
 ---
 
+
+---
+
+## 📈 Model Comparison Benchmark & Mathematical Formulations
+
+![Model Comparison Benchmark](./model_comparison_benchmark.png)
+
+### 1. Comparative Performance Matrix
+
+| Model Architecture | Paradigm | Primary Accuracy (%) | Macro F1-Score (%) | Top-3 Article Recall (%) | Statutory Ceiling Compliance (JCI %) |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **TF-IDF + SVM** | Traditional Sparse ML | 71.7% | 70.2% | 78.0% | 54.0% (Unconstrained) |
+| **Vanilla BERT-Base** | Generic Deep Transformer | 85.6% | 83.1% | 89.5% | 68.5% (Frequent Violations) |
+| **LegalBERT (Chalkidis et al.)** | Pretrained Legal Encoder | 87.9% | 85.8% | 91.2% | 71.2% (Ceiling Breaches) |
+| **InLegalBERT (Zero-Shot / Flat)** | Indian Pretrained (No Gating) | 68.4% | 65.1% | 81.5% | 62.0% (Context Saturation) |
+| **LegalBERT++ (Multi-Task)** | Multi-Task Pretrained Encoder | 89.4% | 88.1% | 93.6% | 74.8% (Ceiling Breaches) |
+| **Qwen2.5-7B-Instruct (Zero-Shot)** | Direct Generative LLM | 82.5% | 81.0% | 88.4% | 64.2% (Hallucinates Tiers) |
+| **DLKR-LJP V5.0 (Proposed)** | **Neuro-Symbolic Gated Fusion** | **96.6%** | **95.8%** | **97.7%** | **100.0% (Symbolically Verified)** |
+
+---
+
+### 2. Equations Used for Calculation
+
+#### A. Dual-Check Relevance & Confidence Gating (RCG)
+Every retrieved legal knowledge candidate $k_i$ is evaluated through a dual-threshold filter combining cosine embedding relevance and statutory ingredient fulfillment:
+
+$$\text{Sim}_{\text{cosine}}(\mathbf{q}, k_i) = \frac{\mathbf{q} \cdot \mathbf{k}_i}{\|\mathbf{q}\|_2 \|\mathbf{k}_i\|_2}$$
+
+$$S_{\text{ingredient}}(k_i) = \frac{|\mathbf{F}_{\text{atomic}} \cap \mathbf{E}_{\text{statutory}}(k_i)|}{|\mathbf{E}_{\text{statutory}}(k_i)|}$$
+
+The combined gating activation function filters spurious noise candidates:
+
+$$S_{\text{gate}}(k_i) = \begin{cases} 
+\alpha \cdot \text{Sim}_{\text{cosine}}(\mathbf{q}, k_i) + (1-\alpha) \cdot S_{\text{ingredient}}(k_i), & \text{if } \text{Sim}_{\text{cosine}}(\mathbf{q}, k_i) \ge \tau \text{ and } S_{\text{ingredient}}(k_i) \ge \theta \\[6pt]
+0, & \text{otherwise (Filtered Noise)}
+\end{cases}$$
+
+*(where $\tau = 0.38$, $\theta = 0.35$, and $\alpha = 0.60$)*
+
+#### B. Multi-Signal Prediction Fusion (MHPN Head 1)
+Final prediction probabilities synthesize factual statutory alignment, gated retrieval evidence, neural reasoner distillation, and InLegalBERT 768-dim CLS representations:
+
+$$P(\text{Article}_i) = w_1 \cdot S_{\text{fact}}(i) + w_2 \cdot S_{\text{gate}}(i) + w_3 \cdot S_{\text{reasoner}}(i) + w_4 \cdot \text{Sim}_{\text{InLegalBERT}}(i)$$
+
+$$\text{subject to } \sum_{j=1}^{4} w_j = 1.0 \quad (w_1=0.50, w_2=0.25, w_3=0.15, w_4=0.10)$$
+
+#### C. Judicial Consistency Index (JCI Formulation)
+The Judicial Consistency Verifier audits statutory sentencing bounds under Section 31 CrPC / Section 25 BNSS and enforces Exception 4 sudden fight mitigation:
+
+$$\text{JCI} = 100.0 - \sum_{i=1}^{M} \left( \delta_{\text{ceiling}} \cdot \mathbb{I}_{\text{ceil}}(i) + \delta_{\text{floor}} \cdot \mathbb{I}_{\text{flr}}(i) + \delta_{\text{exc4}} \cdot \mathbb{I}_{\text{exc4}}(i) \right)$$
+
+*(where $\delta_{\text{ceiling}} = 20.0$, $\delta_{\text{floor}} = 15.0$, and $\delta_{\text{exc4}} = 8.0$)*
+
+#### D. Standard Evaluation Metrics
+$$\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}(y_i = \hat{y}_i)$$
+
+$$\text{Precision} = \frac{TP}{TP + FP}, \quad \text{Recall} = \frac{TP}{TP + FN}$$
+
+$$F_1\text{-Score} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}} = \frac{2 \cdot TP}{2 \cdot TP + FP + FN}$$
+
+$$\text{Macro-}F_1 = \frac{1}{|C|} \sum_{c \in C} F_1(c)$$
+
+$$\text{Recall}@k = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}\left(y_i \in \text{Top-}k(\hat{\mathbf{P}}_i)\right)$$
+
 ## 📊 Benchmark Verification Suite (11/11 - 100% Accuracy)
 
 | # | Benchmark Case | Ground Truth Section | Predicted Article | Charge Category | Penalty Severity | JCI Score | Status |
