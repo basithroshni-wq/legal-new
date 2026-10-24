@@ -3213,7 +3213,7 @@ class DynamicLjpPipeline:
             import torch
             has_cuda = torch.cuda.is_available()
             if should_load is None:
-                should_load = has_cuda or getattr(config, "IS_COLAB", False)
+                should_load = has_cuda or getattr(config, "IS_COLAB", False) or getattr(config, "IS_KAGGLE", False)
         except ImportError:
             should_load = False
 
@@ -3337,10 +3337,12 @@ class DynamicLjpPipeline:
 # Lazy global pipeline accessor
 _PIPELINE_INSTANCE: Optional[DynamicLjpPipeline] = None
 
-def get_pipeline() -> DynamicLjpPipeline:
+def get_pipeline(load_transformer: Optional[bool] = None) -> DynamicLjpPipeline:
     global _PIPELINE_INSTANCE
     if _PIPELINE_INSTANCE is None:
-        _PIPELINE_INSTANCE = DynamicLjpPipeline(load_transformer=None)
+        _PIPELINE_INSTANCE = DynamicLjpPipeline(load_transformer=load_transformer)
+    elif load_transformer is not None and not _PIPELINE_INSTANCE.predictor.is_loaded and load_transformer:
+        _PIPELINE_INSTANCE = DynamicLjpPipeline(load_transformer=load_transformer)
     return _PIPELINE_INSTANCE
 
 
