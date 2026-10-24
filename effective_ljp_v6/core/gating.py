@@ -60,9 +60,10 @@ class RelevanceAndConfidenceGate:
                 rejection_reason = "Disqualified: Statutory premise requires death of victim, but no fatality occurred."
 
             # Attempt to murder cannot stand if victim died (elevates to substantive homicide)
-            elif candidate.id == "STAT_307_IPC" and facts.death_caused:
+            # or if overt act towards causing death is completely absent
+            elif candidate.id == "STAT_307_IPC" and (facts.death_caused or ("attempt_to_murder" not in facts.extracted_tokens and not (facts.injury_severity == "Grievous" and facts.weapon_used))):
                 is_disqualified = True
-                rejection_reason = "Disqualified: Victim succumbed to injuries; charge subsumed under substantive homicide (Sec 302/304)."
+                rejection_reason = "Disqualified: Essential ingredients of attempt to murder (overt act towards causing death with murderous intent) are absent."
 
             # Simple theft cannot stand if physical force or weapons were used (elevates to robbery Sec 392)
             elif candidate.id == "STAT_379_IPC" and (facts.force_or_violence_used or facts.weapon_used or facts.is_robbery or facts.is_dacoity):

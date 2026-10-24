@@ -193,22 +193,27 @@ class ScopedFactExtractor:
         victim_survived = bool(re.search(r"\b(surviv\w*|sav\w*|out of danger|resuscitated|pulled (?:him|her|the victim )?back|underwent (?:emergency )?(?:surgery|laparotomy|thoracotomy)|discharged|recovered|timely (?:medical|vascular|surgical) (?:aid|intervention|repair))\b", lower))
         is_threat_or_intent_of_death = bool(re.search(r"\b(threats? of (?:immediate |instant )?death|threaten\w* (?:to kill|with death|to shoot|with dire consequences)|intend\w* (?:his|her|their)?\s*death|shoot (?:you|him|her|them) dead|will shoot you dead)\b", lower))
 
-        # Idioms and non-fatal legal documents that mention 'dead' or 'death'
-        is_idiomatic_dead = bool(re.search(r"\b(dead of night|death certificate of a living|false death certificate|shoot (?:you|him|her|them) dead)\b", lower))
+        # Explicit negation of fatality: "no fatal injury", "not fatal", "without fatality"
+        is_negated_fatal = bool(re.search(r"\b(no (?:fatal|fatality|death)|not fatal|without (?:any )?(?:fatal|fatality|death)|non-fatal)\b", lower))
 
-        # Accurate Actus Reus Fatality: Must distinguish actual death from threats, survival, or idioms
-        actual_death_patterns = (bool(re.search(r"\b(died|dead|found dead|succumb\w*|fatal\w*|fatality|fatalities|corpse|post-mortem|autopsy|deceased|strangled to death|beaten to death|causing death|resulted in death|kill\w*|demise)\b", lower)) and not is_idiomatic_dead) or (bool(re.search(r"\b(death)\b", lower)) and not is_threat_or_intent_of_death and not is_idiomatic_dead)
+        # Civil / Will documents mentioning already deceased persons (not homicides caused by accused)
+        is_prior_deceased_relative = bool(re.search(r"\b(deceased (?:witness|attesting witness|testator|uncle|father|mother|brother|sister|parents|husband|relative)|late (?:brother|father|mother|uncle|husband|testator))\b", lower))
+        is_idiomatic_dead = bool(re.search(r"\b(dead of night|death certificate of a living|false death certificate|shoot (?:you|him|her|them) dead)\b", lower)) or is_prior_deceased_relative
+
+        # Accurate Actus Reus Fatality: Must distinguish actual death from threats, survival, negations, or idioms
+        actual_death_patterns = ((bool(re.search(r"\b(died|dead|found dead|succumb\w*|fatal\w*|fatality|fatalities|corpse|post-mortem|autopsy|strangled to death|beaten to death|causing death|resulted in death|kill\w*|demise)\b", lower)) and not is_idiomatic_dead and not is_negated_fatal) or (bool(re.search(r"\b(deceased)\b", lower)) and not is_prior_deceased_relative and not is_idiomatic_dead and not is_negated_fatal) or (bool(re.search(r"\b(death)\b", lower)) and not is_threat_or_intent_of_death and not is_idiomatic_dead and not is_negated_fatal))
         
-        death_caused = actual_death_patterns and not victim_survived
+        death_caused = actual_death_patterns and not victim_survived and not is_negated_fatal
 
         if death_caused:
             injury_severity = "Fatal"
             tokens.append("death_caused")
         else:
-            # Exclude threats of bodily injury from actual grievous hurt
+            # Exclude threats of bodily injury and explicit negations from actual grievous hurt
             is_threat_of_hurt = bool(re.search(r"\b(threaten\w* to|threats? of)\b[^.!?]*\b(teeth|fracture|smash|break)\b", lower))
-            has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid)\b", lower)) and not is_threat_of_hurt and not bool(re.search(r"\b(without fracture|no fracture|without grievous|no danger to life|without (?:permanent )?disfigurement)\b", lower)))
-            has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut\w*|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds)\b", lower))
+            has_negated_grievous = bool(re.search(r"\b(without (?:any )?(?:bone involvement|fracture|grievous|danger to life|permanent disfigurement|harm)|no (?:fracture|grievous|danger to life)|or grievous injury)\b", lower))
+            has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid)\b", lower)) and not is_threat_of_hurt and not has_negated_grievous)
+            has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut\w*|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze)\b", lower))
 
             if has_grievous:
                 injury_severity = "Grievous"
@@ -220,7 +225,7 @@ class ScopedFactExtractor:
                 injury_severity = "None"
 
         # --- 3. Premeditation, Intent & Sudden Fight (Fix F-04) ---
-        negated_premed = bool(re.search(r"\b(no prior (?:enmity|animosity|planning|ill-will)|not planned|unpremeditated|without premeditation|without prior (?:enmity|planning)|no long-standing grudge|unscripted argument)\b", lower))
+        negated_premed = bool(re.search(r"\b(no (?:prior )?(?:enmity|animosity|planning|ill-will)|not planned|unpremeditated|without (?:any )?(?:premeditation|planning|prior (?:enmity|planning))|no long-standing grudge|unscripted argument)\b", lower))
         positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|threatened revenge|planned in advance|planned the murder|lying in wait|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|purchased.*specifically to eliminate|lured.*to eliminate|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison)|honor killing)\b", lower))
 
         if positive_premed and not negated_premed:
@@ -229,7 +234,7 @@ class ScopedFactExtractor:
         else:
             has_premeditation = False
 
-        sudden_quarrel = bool(re.search(r"\b(sudden (?:quarrel|fight|altercation|argument|spat)|heat of passion|hot blood|hot words|spontaneous (?:fight|altercation)|impromptu.*brawl|during an argument|unscripted argument|in a sudden quarrel)\b", lower))
+        sudden_quarrel = bool(re.search(r"\b(sudden (?:quarrel|fight|altercation|argument|spat|fit of rage|fit of anger)|heat of passion|hot blood|hot words|spontaneous (?:fight|altercation)|impromptu.*(?:brawl|quarrel|fight)|during an argument|unscripted argument|in a sudden quarrel)\b", lower))
         if sudden_quarrel or negated_premed:
             is_sudden_fight = True
             heat_of_passion = True
@@ -251,17 +256,17 @@ class ScopedFactExtractor:
 
         # --- 4. Attempt to Murder Scoping (Fix F-02) ---
         if not death_caused:
-            attempt_expressions = bool(re.search(r"\b(intend\w* to (?:murder|cause death)|intent\w* to (?:kill|eliminate)|attempted to (?:slit|murder|kill)|aimed and shot|bullet penetrated|shot.*in the (?:chest|abdomen|neck)|fired (?:three )?bullets|slashed.*throat|mixed (?:arsenic|poison)|rammed.*against.*pillar|pushed.*into an active railway track|threw.*off the terrace|set.*locked shop on fire|strangled.*until he lost consciousness|pipe bomb|stabbed.*(?:thoracic|chest|abdomen|throat).*intending to cause death)\b", lower))
+            attempt_expressions = bool(re.search(r"\b(intend\w* to (?:murder|cause death|kill|eliminate)|intent\w* to (?:kill|eliminate)|attempted to (?:slit|murder|kill)|aimed and shot|bullet penetrated|shot.*in the (?:chest|abdomen|neck)|fired (?:three )?bullets|slashed.*throat|slashed at (?:her|his|their)?\s*neck|mixed (?:arsenic|poison)|rammed.*against.*pillar|pushed.*into an active railway track|(?:threw|shoved).*off the terrace|set.*locked shop on fire|strangled.*until he lost consciousness|pipe bomb|stabbed.*(?:thoracic|chest|abdomen|throat).*intending to cause death)\b", lower))
             if attempt_expressions:
                 tokens.append("attempt_to_murder")
                 tokens.append("overt_act_towards_commission_of_murder")
 
         # --- 5. Property Crimes: Theft vs Robbery vs Cheating (Fix F-07) ---
-        stole_property = bool(re.search(r"\b(stole\w*|theft|thief|took (?:away|it away)|shoplift\w*|lifted|pilfer\w*|pickpocket\w*|concealed.*handbag|walked out without paying|slipped.*into.*pocket|removed.*without.*consent|without (?:the )?owner'?s? (?:knowledge|consent|permission)|without (?:anyone'?s? )?permission|discreetly reached|snatched|looted|quietly detached|untied two cows)\b", lower))
+        stole_property = bool(re.search(r"\b(stole\w*|theft|thief|took (?:away|it away)|shoplift\w*|lifted|pilfer\w*|pickpocket\w*|slid (?:his|her) hand|slipped away with|discreetly removed|concealed.*(?:handbag|backpack)|walked out without paying|slipped.*into.*pocket|removed.*without.*consent|without (?:the )?(?:owner'?s?|commuter'?s?|victim'?s?|anyone'?s? )?(?:knowledge|consent|permission)|discreetly reached|snatched|looted|quietly detached|untied two cows)\b", lower))
         extortion_or_intimidation = bool(re.search(r"\b(demanded (?:wallet|money|cash|phone|gold|all cash)|held.*(?:knife|gun|dagger|revolver|pistol|iron rod|sickle|cleaver)|threats? of (?:immediate |instant )?death|held at gunpoint|held at knifepoint|pointed a (?:firearm|revolver|pistol|dagger|knife)|extorted|at gunpoint|under threat of instant hurt|pushed.*corner.*knife|pressed a razor blade|ambushed.*atm customer.*dagger)\b", lower))
-        force_exerted = bool(re.search(r"\b(shoved|pushed|strangled|pinned down|dragged|inflicted blow|threatened with immediate death|threatened immediate violence|forcibly took|snatched.*by force|grabbed.*by her hair)\b", lower))
+        force_exerted = bool(re.search(r"\b(slammed|shoved|pushed|strangled|pinned down|dragged|inflicted blow|threatened with immediate death|threatened immediate violence|forcibly took|snatched.*by force|grabbed.*by her hair)\b", lower))
 
-        if extortion_or_intimidation or (stole_property and (weapon_used or force_exerted)) or (bool(re.search(r"\b(brandished.*threatened immediate violence.*forcibly took)\b", lower))):
+        if extortion_or_intimidation or (stole_property and (weapon_used or force_exerted)) or bool(re.search(r"\b(forcibly took|brandished.*forcibly took)\b", lower)):
             is_robbery = True
             force_or_violence_used = True
             tokens.append("robbery_committed")
