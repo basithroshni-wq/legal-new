@@ -82,31 +82,45 @@ class CalibratedLegalPredictor:
             elif facts.injury_severity == "Simple" and not facts.weapon_used and cand.id == "STAT_323_IPC" and not facts.death_caused:
                 z += 0.50
 
-            if facts.is_intimidation and cand.id == "STAT_506_IPC":
-                z += 0.50
+            if facts.is_intimidation and cand.id == "STAT_506_IPC" and not facts.is_robbery and not facts.is_sexual_offence and not facts.death_caused:
+                z += 0.60
 
             if facts.is_dacoity and cand.id == "STAT_395_IPC":
-                z += 0.60
+                z += 0.70
             elif facts.is_robbery and cand.id == "STAT_392_IPC" and not facts.is_dacoity:
-                z += 0.50
+                z += 0.60
+                if cand.id == "STAT_506_IPC":
+                    z -= 0.60
             elif facts.is_theft and cand.id == "STAT_379_IPC" and not facts.is_robbery and not facts.is_dacoity:
-                z += 0.50
+                z += 0.60
 
             if facts.is_forgery and cand.id in ("STAT_468_IPC", "STAT_471_IPC"):
-                z += 0.50
+                z += 0.60
             elif facts.is_breach_of_trust and cand.id == "STAT_406_IPC":
-                z += 0.50
+                z += 0.90
             elif facts.is_fraud_or_cheating and cand.id == "STAT_420_IPC" and not facts.is_forgery and not facts.is_breach_of_trust:
-                z += 0.50
+                z += 0.60
 
-            if facts.is_matrimonial and cand.id == "STAT_498A_IPC" and not facts.death_caused:
-                z += 0.50
+            if facts.is_breach_of_trust and cand.id == "STAT_420_IPC":
+                z -= 0.60
+
+            if facts.is_sexual_offence:
+                if cand.id == "STAT_376_IPC":
+                    z += 1.20
+                elif cand.id in ("STAT_506_IPC", "STAT_498A_IPC", "STAT_406_IPC"):
+                    z -= 1.00
+
+            if facts.death_caused and cand.id in ("STAT_506_IPC", "STAT_406_IPC", "STAT_420_IPC"):
+                z -= 1.00
+
+            if facts.is_matrimonial and cand.id == "STAT_498A_IPC" and not facts.death_caused and not facts.is_sexual_offence:
+                z += 0.60
 
             if facts.is_commercial_civil_dispute:
                 if cand.id == "STAT_CIVIL_482":
-                    z += 1.20
-                elif cand.id in ("STAT_406_IPC", "STAT_420_IPC", "STAT_468_IPC", "STAT_506_IPC"):
-                    z -= 0.80
+                    z += 1.50
+                elif cand.id in ("STAT_406_IPC", "STAT_420_IPC", "STAT_468_IPC", "STAT_506_IPC", "STAT_302_IPC", "STAT_304_P1_IPC", "STAT_304_P2_IPC"):
+                    z -= 1.00
 
             # Inchoate and vicarious liability provisions cannot eclipse substantive charges
             if cand.id in ("STAT_34_IPC", "STAT_120B_IPC"):

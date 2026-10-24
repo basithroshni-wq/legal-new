@@ -91,10 +91,10 @@ class RelevanceAndConfidenceGate:
                 is_disqualified = True
                 rejection_reason = "Disqualified: Dangerous weapon or grievous hurt involved; Section 323 is restricted to simple unarmed assault."
 
-            # Criminal intimidation disqualified if physical violence, death, or robbery
-            elif candidate.id == "STAT_506_IPC" and (facts.death_caused or facts.injury_severity in ("Simple", "Grievous") or facts.is_robbery or "attempt_to_murder" in facts.extracted_tokens):
+            # Criminal intimidation disqualified if physical violence, death, robbery, or sexual offences
+            elif candidate.id == "STAT_506_IPC" and (facts.death_caused or facts.injury_severity in ("Simple", "Grievous") or facts.is_robbery or facts.is_sexual_offence or "attempt_to_murder" in facts.extracted_tokens):
                 is_disqualified = True
-                rejection_reason = "Disqualified: Overt physical violence, robbery, or homicide elevates crime beyond mere criminal intimidation."
+                rejection_reason = "Disqualified: Overt physical violence, robbery, sexual offence, or homicide elevates crime beyond mere criminal intimidation."
 
             # Domain-targeted protection: Do NOT noise filter candidates directly matched by extracted facts
             domain_protected = False
@@ -129,6 +129,10 @@ class RelevanceAndConfidenceGate:
             elif facts.death_caused and facts.is_dowry_death and candidate.id == "STAT_304B_IPC":
                 domain_protected = True
             elif "attempt_to_murder" in facts.extracted_tokens and candidate.id == "STAT_307_IPC":
+                domain_protected = True
+            elif facts.is_sexual_offence and candidate.id == "STAT_376_IPC":
+                domain_protected = True
+            elif facts.is_matrimonial and not facts.death_caused and candidate.id == "STAT_498A_IPC":
                 domain_protected = True
 
             # Low relevance or insufficient ingredient fulfillment check
@@ -193,5 +197,7 @@ class RelevanceAndConfidenceGate:
             return facts.has_common_intention or facts.accused_count >= 2
         if "conspiracy" in ing:
             return facts.is_criminal_conspiracy
+        if "sexual" in ing or "rape" in ing or "against_will" in ing or "consent" in ing:
+            return facts.is_sexual_offence
 
         return False
