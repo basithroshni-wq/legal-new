@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+runtime_data/
+checkpoints/
+chroma_legal_kb/
+*.zip
+*.pdf
+.system_generated/
