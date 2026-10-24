@@ -167,7 +167,7 @@ class ScopedFactExtractor:
         
         # Avoid treating shop merchandise (e.g. bottle of perfume) as weapon
         bottle_is_weapon = bool(re.search(r"\b(broken bottle|struck.*with.*bottle|hit.*with.*bottle|swung.*bottle|threw.*bottle)\b", lower))
-        has_blunt = bool(re.search(r"\b(iron rod|lathi|stick|club|wooden log|bat|crowbar|wrench|spade|hammer|pipe|chain|bicycle chain|bar stool|bamboo pole|rolling pin|iron pipe|iron bar|wooden stool|baton|shepherd's crook)\b", lower)) or bottle_is_weapon
+        has_blunt = bool(re.search(r"\b(iron rod|lathi|stick|club|wooden log|bat|crowbar|wrench|spade|hammer|pipe|iron chain|bicycle chain|heavy chain|steel chain|bar stool|bamboo pole|rolling pin|iron pipe|iron bar|wooden stool|baton|shepherd's crook)\b", lower)) or bottle_is_weapon
         
         has_firearm = bool(re.search(r"\b(gun|pistol|revolver|rifle|firearm|bullets?|shotguns?|pellet gun|pipe bomb|country-made pistol|country pistol|shots?|fired|shooting)\b", lower))
         has_stone = bool(re.search(r"\b(stone|granite edge)\b", lower))
@@ -221,7 +221,7 @@ class ScopedFactExtractor:
             is_threat_of_hurt = bool(re.search(r"\b(threaten\w* to|threats? of)\b[^.!?]*\b(teeth|fracture|smash|break)\b", lower))
             has_negated_grievous = bool(re.search(r"\b(without (?:any )?(?:bone involvement|fracture|skeletal fracture|grievous|danger to life|permanent disfigurement|harm)|no (?:fracture|skeletal fracture|grievous|danger to life)|did not cause (?:any )?(?:fracture|skeletal fracture|grievous|harm|injury)|or grievous injury)\b", lower))
             has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid)\b", lower)) and not is_threat_of_hurt and not has_negated_grievous)
-            has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut\w*|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze)\b", lower))
+            has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut|cuts|cutting|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze)\b", lower))
 
             if has_grievous:
                 injury_severity = "Grievous"
