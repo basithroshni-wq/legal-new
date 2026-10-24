@@ -174,7 +174,7 @@ class ScopedFactExtractor:
 
         # Check who was armed vs unarmed (Crucial F-03 fix)
         victim_unarmed = bool(re.search(r"\b(victim|deceased|complainant|informant|target)\b[^.!?]*\b(unarmed|had no weapon|without weapon)\b", lower))
-        accused_unarmed = bool(re.search(r"\b(accused|assailant|culprit|attacker)\b[^.!?]*\b(unarmed|had no weapon|without weapon|no weapon used|with no weapon|bare fist|with fists)\b", lower)) or bool(re.search(r"\b(no weapon(?: used)?|without any weapon|without any instrument|with no instrument)\b", lower))
+        accused_unarmed = bool(re.search(r"\b(accused|assailant|culprit|attacker)\b[^.!?]*\b(unarmed|had no weapon|without weapon|no weapon used|with no weapon|bare fist|with fists)\b", lower)) or bool(re.search(r"\b(no weapon(?: used)?|without any weapon|without any instrument|with no instrument|without\s+(?:brandishing|using|possessing|carrying)?\s*(?:any\s+)?(?:knife|weapon|firearm|instrument)|no weapon(?:s)? used|with no weapon(?:s)?)\b", lower))
 
         if (has_corrosive or has_sharp or has_blunt or has_firearm or has_stone) and not accused_unarmed:
             weapon_used = True
@@ -219,7 +219,7 @@ class ScopedFactExtractor:
         else:
             # Exclude threats of bodily injury and explicit negations from actual grievous hurt
             is_threat_of_hurt = bool(re.search(r"\b(threaten\w* to|threats? of)\b[^.!?]*\b(teeth|fracture|smash|break)\b", lower))
-            has_negated_grievous = bool(re.search(r"\b(without (?:any )?(?:bone involvement|fracture|skeletal fracture|grievous|danger to life|permanent disfigurement|harm)|no (?:fracture|skeletal fracture|grievous|danger to life)|did not cause (?:any )?(?:fracture|skeletal fracture|grievous|harm|injury)|or grievous injury)\b", lower))
+            has_negated_grievous = bool(re.search(r"\b(without\s+(?:any\s+)?[^.!?]*(?:bone involvement|fracture|skeletal fracture|grievous|danger to life|permanent disfigurement|severance|harm)|no\s+[^.!?]*(?:fracture|skeletal fracture|grievous|danger to life|weapons or grievous)|did not cause\s+(?:any\s+)?[^.!?]*(?:fracture|skeletal fracture|grievous|harm|injury)|with no weapons or grievous|no weapons or grievous|or grievous injury)\b", lower))
             has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid)\b", lower)) and not is_threat_of_hurt and not has_negated_grievous)
             has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut|cuts|cutting|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze)\b", lower))
 
@@ -234,7 +234,7 @@ class ScopedFactExtractor:
 
         # --- 3. Premeditation, Intent & Sudden Fight (Fix F-04) ---
         negated_premed = bool(re.search(r"\b(no (?:prior )?(?:enmity|animosity|planning|ill-will)|not planned|unpremeditated|without (?:any )?(?:premeditation|planning|prior (?:enmity|planning))|no long-standing grudge|unscripted argument)\b", lower))
-        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|electoral grudge|threatened revenge|planned in advance|planned the murder|lying in wait|waited for the victim|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|hired (?:two |three )?(?:sharpshooters|contract killers|hitmen)|contract (?:killing|shooters?|hit)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun)|lured.*to (?:eliminate|an abandoned|isolated|warehouse)|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison)|honor killing)\b", lower))
+        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|electoral grudge|threatened revenge|planned in advance|planned the murder|lying in wait|waited for the victim|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|hired (?:two |three )?(?:sharpshooters|contract killers|hitmen)|contract (?:killing|shooters?|hit)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun)|lured.*to (?:eliminate|an abandoned|isolated|warehouse)|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison)|honor killing|deep rancor|rancor|stalked.*(?:victim|deceased|complainant)|decapitat\w*|procured.*(?:machete|knife|weapon|pistol|gun|axe|talwar|crowbar))\b", lower))
 
         if positive_premed and not negated_premed:
             has_premeditation = True
@@ -251,7 +251,7 @@ class ScopedFactExtractor:
         is_provocation = bool(re.search(r"\b(grave and sudden provocation|exceeding (?:private defence|right of private defence)|excess of the right of private defence|provocation)\b", lower))
 
         if death_caused:
-            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed)\b", lower))
+            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck)\b", lower))
             if (has_premeditation or lethal_vital_attack) and not is_sudden_fight and not is_provocation:
                 intention_to_cause_death = True
                 tokens.append("intention_to_cause_death")
@@ -272,7 +272,7 @@ class ScopedFactExtractor:
 
         # --- 5. Property Crimes: Theft vs Robbery vs Cheating (Fix F-07) ---
         # Ensure weapon picking (e.g. snatching a scythe/stick from ground) is NOT treated as theft
-        stole_property = bool(re.search(r"\b(stole\w*|theft|thief|took away|took (?:a |the |away|it away)?\s*(?:[a-z]+\s+)?(?:wrist watch|watch|mobile|phone|bag|handbag|backpack|cash|wallet|necklace|jewelry|valuables|ornaments|motorcycle|bike)|shoplift\w*|lifted|pilfer\w*|pickpocket\w*|slid (?:his|her) hand|slipped away with|discreetly removed|concealed.*(?:handbag|backpack|jacket|pocket)|walked out without paying|exited.*without.*pay\w*|slipped.*into.*pocket|removed.*without.*consent|without (?:the )?(?:owner'?s?|commuter'?s?|victim'?s?|anyone'?s? )?(?:knowledge|consent|permission)|drove away with.*motorcycle|stole.*motorcycle|broke the handlebar lock|forcefully stripped.*of|stripped.*of.*cash|discreetly reached|looted|quietly detached|untied two cows)\b", lower))
+        stole_property = bool(re.search(r"\b(stole\w*|theft|thief|took away|took (?:a |the |away|it away)?\s*(?:[a-z]+\s+)?(?:wrist watch|watch|mobile|phone|bag|handbag|backpack|cash|wallet|necklace|jewelry|valuables|ornaments|motorcycle|bike)|shoplift\w*|lifted|pilfer\w*|pickpocket\w*|slid (?:his|her) hand|slipped away with|discreetly removed|concealed.*(?:handbag|backpack|jacket|pocket)|walked out without paying|exited.*without.*pay\w*|slipped.*into.*pocket|removed.*without.*consent|without\s+(?:the\s+)?(?:(?:owner|commuter|victim|anyone)'?s?\s+)?(?:knowledge|consent|permission)|drove away with.*motorcycle|stole.*motorcycle|broke the handlebar lock|forcefully stripped.*of|stripped.*of.*cash|discreetly reached|looted|quietly detached|untied two cows|surreptitiously\s+(?:picked\s+up|removed|took)|merely snatched|snatched\s+(?:a\s+)?(?:purse|wallet|bag|chain|mobile|phone)\s+while\s+running)\b", lower))
         extortion_or_intimidation = bool(re.search(r"\b(demanded (?:wallet|money|cash|phone|gold|all cash|.*earnings|earnings)|held.*(?:knife|gun|dagger|revolver|pistol|iron rod|sickle|cleaver)|threats? of (?:immediate |instant )?death|held at gunpoint|held at knifepoint|pointed a (?:firearm|revolver|pistol|dagger|knife)|extorted|at gunpoint|under threat of instant hurt|pushed.*corner.*knife|pressed a razor blade|ambushed.*atm customer.*dagger)\b", lower))
         force_exerted = bool(re.search(r"\b(slammed|shoved|pushed|strangled|pinned down|dragged|inflicted blow|threatened with immediate death|threatened immediate violence|forcibly took|snatched.*by force|grabbed.*by her hair|forcefully stripped.*of)\b", lower))
 
@@ -302,9 +302,15 @@ class ScopedFactExtractor:
             tokens.append("forged_document_fabricated")
 
         # --- 6. Matrimonial Cruelty & Dowry Death (Fix F-07) ---
-        matrimonial_context = bool(re.search(r"\b(husband|in-laws|mother-in-law|sister-in-law|marital home|matrimonial home|marital bedroom|wife|married)\b", lower))
-        dowry_demand = bool(re.search(r"\b(dowry|failing to bring|unlawful demand for (?:cash|car|gold|property)|harassed for dowry|dowry demands)\b", lower))
+        matrimonial_context = bool(re.search(r"\b(husband|in-laws|mother-in-law|sister-in-law|marital home|matrimonial home|marital bedroom|matrimonial bedroom|wife|married|marriage)\b", lower))
+        dowry_demand = bool(re.search(r"\b(dowry|failing to bring|unlawful demand for (?:cash|car|gold|property)|harassed for dowry|dowry demands|demand\w*\s+(?:for\s+)?(?:an\s+)?(?:additional\s+)?(?:gold|cash|dowry|car|money|necklace))\b", lower))
         marriage_within_7 = bool(re.search(r"\b(married\b[^.!?]*\b(?:one|two|three|four|five|six|seven|\d+)\s*(?:years?|yrs?|months?)|(?:one|two|three|four|five|six|seven|\d+)\s*(?:years?|yrs?|months?)\s+of\s+marriage|married for only \d+ months)\b", lower))
+
+        m_yr_match = re.search(r"\b(?:within\s+)?(\d+|one|two|three|four|five|six|seven)\s*(?:years?|yrs?)\s+of\s+marriage\b", lower)
+        if m_yr_match:
+            w_map = {"one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0, "five": 5.0, "six": 6.0, "seven": 7.0}
+            yr_str = m_yr_match.group(1)
+            marriage_years = w_map.get(yr_str, float(yr_str) if yr_str.isdigit() else None)
 
         if matrimonial_context:
             is_matrimonial = True
@@ -320,7 +326,8 @@ class ScopedFactExtractor:
             tokens.append("sexual_offence_rape")
 
         intimidation_triggers = bool(re.search(r"\b(threaten\w*|threats?)\b[^.!?]*\b(shoot|kill|burn|harm|kidnap|injur\w*|dire consequences|slit|destroy|acid)\b", lower)) or bool(re.search(r"\b(criminal intimidation|showed.*bottle of acid.*threatened|death threats?)\b", lower))
-        if (weapon_used and injury_severity == "None" and not is_robbery) or (intimidation_triggers and not death_caused and not is_robbery):
+        negated_threat = bool(re.search(r"\b(without\s+(?:any\s+)?threats?|no\s+threats?)\b", lower))
+        if (weapon_used and injury_severity == "None" and not is_robbery and not accused_unarmed and not negated_threat) or (intimidation_triggers and not death_caused and not is_robbery and not negated_threat):
             is_intimidation = True
             tokens.append("criminal_intimidation")
 
