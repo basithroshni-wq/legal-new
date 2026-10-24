@@ -101,8 +101,10 @@ class JudicialConsistencyVerifier:
         # --- Audit 2: Statutory Ceiling Audit (CrPC 31 / BNSS 25) ---
         authorized_ceiling_years = self._get_statutory_max_years(top_article.ipc_section)
         pred_tier_years = self.tier_hierarchy.get(rec_penalty.predicted_tier, 0)
+        authorized_tier = self._years_to_tier(authorized_ceiling_years)
+        authorized_tier_years = self.tier_hierarchy.get(authorized_tier, 0)
 
-        if pred_tier_years > authorized_ceiling_years and authorized_ceiling_years > 0:
+        if pred_tier_years > authorized_tier_years and authorized_tier_years > 0:
             deductions.append({
                 "type": "Statutory Ceiling Breach",
                 "penalty": 20.0,
@@ -111,13 +113,15 @@ class JudicialConsistencyVerifier:
             jci_score -= 20.0
 
             # Reconcile penalty tier down to the statutory maximum
-            authorized_tier = self._years_to_tier(authorized_ceiling_years)
             rec_penalty.predicted_tier = authorized_tier
             rec_penalty.statutory_ceiling_years = authorized_ceiling_years
             rec_penalty.reconciled_by_jcv = True
             reconciliations.append(
                 f"Statutory ceiling enforced under Section 31 CrPC / Section 25 BNSS: penalty capped at {authorized_tier}."
             )
+
+        if "304a" in top_article.ipc_section.lower() or "354a" in top_article.ipc_section.lower() or "500" in top_article.ipc_section.lower():
+            rec_penalty.is_bailable = True
 
         # Re-sort Head 3 tier probabilities cleanly
         # Ensure consistency flag
@@ -138,17 +142,21 @@ class JudicialConsistencyVerifier:
     def _get_statutory_max_years(self, ipc_section: str) -> int:
         """Returns statutory maximum years allowed under statute."""
         sec = ipc_section.lower()
-        if "302" in sec or "376" in sec or "304b" in sec or "395" in sec or "326" in sec or "307" in sec:
+        if "302" in sec or "376" in sec or "304b" in sec or "395" in sec or "326" in sec or "307" in sec or "394" in sec or "pocso" in sec or "364a" in sec or "304 part i" in sec or "304_p1" in sec or "409" in sec or "436" in sec or "489a" in sec:
             return 99  # Life imprisonment
-        if "304 part ii" in sec or "392" in sec:
+        if "ndps" in sec:
+            return 20
+        if "457" in sec:
+            return 14
+        if "304 part ii" in sec or "392" in sec or "306" in sec:
             return 10
-        if "420" in sec or "468" in sec or "471" in sec:
+        if "420" in sec or "468" in sec or "471" in sec or "408" in sec or "304a" in sec or "380" in sec or "pc act" in sec or "corruption" in sec or "arms" in sec or "363" in sec or "201" in sec:
             return 7
-        if "379" in sec or "406" in sec or "498a" in sec or "324" in sec:
+        if "379" in sec or "406" in sec or "498a" in sec or "324" in sec or "354a" in sec or "384" in sec or "66d" in sec or "153a" in sec or "354d" in sec:
             return 3
-        if "506" in sec:
+        if "506" in sec or "500" in sec or "138" in sec:
             return 2
-        if "323" in sec:
+        if "323" in sec or "447" in sec:
             return 1
         if "482" in sec or "civil" in sec:
             return 0

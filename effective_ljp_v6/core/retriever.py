@@ -184,10 +184,36 @@ class HybridLegalRetriever:
             query_components.append("forgery false document valuable security electronic record 468 471")
         if facts.is_breach_of_trust:
             query_components.append("criminal breach of trust 406 316 entrusted dominion over property")
+        if getattr(facts, "is_breach_of_trust_clerk_servant", False):
+            query_components.append("criminal breach of trust clerk servant employee 408 316")
+        if getattr(facts, "is_criminal_negligence", False):
+            query_components.append("causing death by negligence rash negligent driving vehicle 304a 106")
+        if getattr(facts, "is_sexual_harassment", False):
+            query_components.append("sexual harassment unwelcome remarks demands 354a 75")
         if facts.is_matrimonial:
             query_components.append("cruelty harassment husband in-laws dowry 498a 304b")
         if facts.is_intimidation:
             query_components.append("criminal intimidation 506 351 threatening injury reputation")
+        if getattr(facts, "is_criminal_trespass", False):
+            query_components.append("criminal trespass entered property without permission 447 329 fenced boundary")
+        if getattr(facts, "is_defamation", False):
+            query_components.append("defamation harm reputation published false social media post 500 356")
+        if getattr(facts, "is_housebreaking", False):
+            query_components.append("house-breaking lurking house-trespass night rear window dwelling house 457 331")
+        if getattr(facts, "is_theft_in_dwelling", False):
+            query_components.append("theft dwelling house residential building laptop gold 380 305")
+        if getattr(facts, "is_robbery_with_hurt", False):
+            query_components.append("robbery causing hurt knife chain snatching 394 309")
+        if getattr(facts, "is_corruption_or_bribery", False):
+            query_components.append("corruption bribery public servant illegal gratification vigilance trap marked notes 7")
+        if getattr(facts, "is_suicide_abetment", False):
+            query_components.append("abetment of suicide suicide note mental physical torture 306 108")
+        if getattr(facts, "is_ndps_narcotics", False):
+            query_components.append("ndps act narcotics possession commercial quantity heroin diacetylmorphine 21")
+        if getattr(facts, "is_cheque_dishonour", False):
+            query_components.append("negotiable instruments act dishonour of cheque insufficient funds statutory notice 138")
+        if getattr(facts, "is_pocso_child_abuse", False):
+            query_components.append("pocso act child sexual abuse aggravated penetrative sexual assault student 6 376")
         if facts.is_commercial_civil_dispute:
             query_components.append("civil commercial contract invoice arbitration quash 482 528")
 

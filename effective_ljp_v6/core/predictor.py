@@ -85,8 +85,14 @@ class CalibratedLegalPredictor:
             if facts.is_intimidation and cand.id == "STAT_506_IPC" and not facts.is_robbery and not facts.is_sexual_offence and not facts.death_caused:
                 z += 0.60
 
-            if facts.is_dacoity and cand.id == "STAT_395_IPC":
+            if getattr(facts, "is_criminal_trespass", False) and cand.id == "STAT_447_IPC":
                 z += 0.70
+
+            if facts.is_dacoity:
+                if cand.id == "STAT_395_IPC":
+                    z += 1.80
+                elif cand.id in ("STAT_392_IPC", "STAT_379_IPC", "STAT_506_IPC", "STAT_447_IPC"):
+                    z -= 1.00
             elif facts.is_robbery and cand.id == "STAT_392_IPC" and not facts.is_dacoity:
                 z += 0.60
                 if cand.id == "STAT_506_IPC":
@@ -96,25 +102,159 @@ class CalibratedLegalPredictor:
 
             if facts.is_forgery and cand.id in ("STAT_468_IPC", "STAT_471_IPC"):
                 z += 0.60
-            elif facts.is_breach_of_trust and cand.id == "STAT_406_IPC":
-                z += 0.90
+            elif facts.is_breach_of_trust:
+                if getattr(facts, "is_breach_of_trust_clerk_servant", False) and cand.id == "STAT_408_IPC":
+                    z += 1.20
+                elif cand.id == "STAT_406_IPC":
+                    z += 0.90
             elif facts.is_fraud_or_cheating and cand.id == "STAT_420_IPC" and not facts.is_forgery and not facts.is_breach_of_trust:
                 z += 0.60
 
             if facts.is_breach_of_trust and cand.id == "STAT_420_IPC":
                 z -= 0.60
 
+            if getattr(facts, "is_criminal_negligence", False) and cand.id == "STAT_304A_IPC":
+                z += 1.30
+
+            if getattr(facts, "is_sexual_harassment", False):
+                if cand.id == "STAT_354A_IPC":
+                    z += 1.30
+                elif cand.id in ("STAT_376_IPC", "STAT_498A_IPC", "STAT_506_IPC"):
+                    z -= 1.00
+
             if facts.is_sexual_offence:
                 if cand.id == "STAT_376_IPC":
                     z += 1.20
-                elif cand.id in ("STAT_506_IPC", "STAT_498A_IPC", "STAT_406_IPC"):
+                elif cand.id in ("STAT_506_IPC", "STAT_498A_IPC", "STAT_406_IPC", "STAT_354A_IPC"):
                     z -= 1.00
 
             if facts.death_caused and cand.id in ("STAT_506_IPC", "STAT_406_IPC", "STAT_420_IPC"):
                 z -= 1.00
 
-            if facts.is_matrimonial and cand.id == "STAT_498A_IPC" and not facts.death_caused and not facts.is_sexual_offence:
+            if facts.is_matrimonial and cand.id == "STAT_498A_IPC" and not facts.death_caused and not facts.is_sexual_offence and not getattr(facts, "is_sexual_harassment", False):
                 z += 0.60
+
+            if getattr(facts, "is_defamation", False):
+                if cand.id == "STAT_500_IPC":
+                    z += 1.80
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_corruption_or_bribery", False):
+                if cand.id == "STAT_PC_ACT_7":
+                    z += 1.80
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_housebreaking", False) and cand.id == "STAT_457_IPC":
+                z += 1.20
+
+            if getattr(facts, "is_theft_in_dwelling", False) and cand.id == "STAT_380_IPC":
+                z += 1.00
+
+            if getattr(facts, "is_robbery_with_hurt", False):
+                if cand.id == "STAT_394_IPC":
+                    z += 1.40
+                elif cand.id == "STAT_392_IPC":
+                    z += 0.80
+                elif cand.id in ("STAT_324_IPC", "STAT_323_IPC"):
+                    z -= 1.00
+
+            if getattr(facts, "is_suicide_abetment", False):
+                if cand.id == "STAT_306_IPC":
+                    z += 1.80
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_ndps_narcotics", False):
+                if cand.id == "STAT_NDPS_21":
+                    z += 1.80
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_cheque_dishonour", False):
+                if cand.id == "STAT_NI_138":
+                    z += 1.80
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_pocso_child_abuse", False):
+                if cand.id == "STAT_POCSO_6":
+                    z += 2.50
+                elif cand.id == "STAT_376_IPC":
+                    z += 0.80
+
+            if getattr(facts, "is_extortion", False):
+                if cand.id == "STAT_384_IPC":
+                    z += 1.80
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_acid_attack", False):
+                if cand.id == "STAT_326A_IPC":
+                    z += 2.50
+                else:
+                    z -= 1.00
+
+            if getattr(facts, "is_kidnapping_ransom", False):
+                if cand.id == "STAT_364A_IPC":
+                    z += 2.50
+                else:
+                    z -= 1.00
+
+            if getattr(facts, "is_cyber_phishing", False):
+                if cand.id == "STAT_IT_66D":
+                    z += 1.80
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_hate_speech_153a", False):
+                if cand.id == "STAT_153A_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_arms_act", False):
+                if cand.id == "STAT_ARMS_25":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_cbt_public_servant_banker", False):
+                if cand.id == "STAT_409_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_arson_fire", False):
+                if cand.id == "STAT_436_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_kidnapping_lawful_guardian", False):
+                if cand.id == "STAT_363_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_stalking", False):
+                if cand.id == "STAT_354D_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_destruction_of_evidence", False):
+                if cand.id == "STAT_201_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_counterfeit_currency", False):
+                if cand.id == "STAT_489A_IPC":
+                    z += 2.50
+                else:
+                    z -= 0.80
 
             if facts.is_commercial_civil_dispute:
                 if cand.id == "STAT_CIVIL_482":

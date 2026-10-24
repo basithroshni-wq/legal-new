@@ -96,9 +96,253 @@ class RelevanceAndConfidenceGate:
                 is_disqualified = True
                 rejection_reason = "Disqualified: Overt physical violence, robbery, sexual offence, or homicide elevates crime beyond mere criminal intimidation."
 
+            # Criminal trespass disqualified if fatality or robbery occurred
+            elif candidate.id == "STAT_447_IPC" and (facts.death_caused or facts.is_robbery):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Fatality or robbery eclipses simple criminal trespass."
+
+            # Criminal negligence: If death was caused by negligence / rash driving without homicidal intent
+            elif getattr(facts, "is_criminal_negligence", False) and candidate.id in ("STAT_302_IPC", "STAT_304_P1_IPC", "STAT_304_P2_IPC", "STAT_304B_IPC", "STAT_307_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Death was caused by criminal negligence / rash act without homicidal mens rea (governed by Section 304A)."
+
+            elif candidate.id == "STAT_304A_IPC" and (not getattr(facts, "is_criminal_negligence", False) or facts.has_premeditation or facts.weapon_used or not facts.death_caused):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 304A strictly applies to rash/negligent death without intentional violence."
+
+            # If robbery occurred, simple hurt under 323 or 324 is absorbed into robbery with hurt (394 / 309(4))
+            elif candidate.id in ("STAT_323_IPC", "STAT_324_IPC") and facts.is_robbery:
+                is_disqualified = True
+                rejection_reason = "Disqualified: Hurt caused during robbery is subsumed under Section 394 / Section 392."
+
+            # Defamation: Non-violent, reputational offence
+            elif getattr(facts, "is_defamation", False) and candidate.id in ("STAT_471_IPC", "STAT_468_IPC", "STAT_420_IPC", "STAT_506_IPC", "STAT_379_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Publication damaging reputation is governed by Section 500 Defamation, not document forgery or cheating."
+
+            elif candidate.id == "STAT_500_IPC" and not getattr(facts, "is_defamation", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 500 requires defamatory imputation harming reputation."
+
+            # Bribery & Corruption (PC Act):
+            elif getattr(facts, "is_corruption_or_bribery", False) and candidate.id in ("STAT_420_IPC", "STAT_406_IPC", "STAT_CIVIL_482", "STAT_379_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Public servant taking illegal gratification / trap is governed by Section 7 PC Act."
+
+            elif candidate.id == "STAT_PC_ACT_7" and not getattr(facts, "is_corruption_or_bribery", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 7 PC Act requires public servant demand/acceptance of illegal gratification."
+
+            # House-breaking / Lurking house-trespass by night:
+            elif candidate.id == "STAT_457_IPC" and not getattr(facts, "is_housebreaking", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 457 requires house-breaking or lurking house-trespass."
+
+            # Theft in dwelling:
+            elif candidate.id == "STAT_380_IPC" and (not getattr(facts, "is_theft_in_dwelling", False) or not facts.is_theft):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 380 requires theft in human dwelling."
+
+            # Robbery with hurt:
+            elif candidate.id == "STAT_394_IPC" and (not facts.is_robbery or not getattr(facts, "is_robbery_with_hurt", False)):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 394 requires robbery coupled with causing hurt."
+
+            # Section 408 requires clerk, servant or employee capacity
+            elif candidate.id == "STAT_408_IPC" and not getattr(facts, "is_breach_of_trust_clerk_servant", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 408 requires clerk, servant or employee capacity."
+
+            # Rape / Sexual offences strictly require sexual offence facts
+            elif candidate.id == "STAT_376_IPC" and not facts.is_sexual_offence:
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 376 strictly requires sexual assault / rape allegations."
+
+            elif candidate.id == "STAT_POCSO_6" and (not facts.is_sexual_offence or not getattr(facts, "is_pocso_child_abuse", False)):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 6 POCSO Act requires aggravated sexual assault on child."
+
+            elif candidate.id == "STAT_447_IPC" and not getattr(facts, "is_criminal_trespass", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 447 requires criminal trespass into property."
+
+            elif candidate.id == "STAT_498A_IPC" and (not facts.is_matrimonial or not any(k in facts.extracted_tokens for k in ("matrimonial_cruelty_498a", "dowry_death_304b", "suicide_abetment_306"))):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 498A strictly requires harassment or cruelty towards a woman in matrimonial context."
+
+            # Abetment of suicide
+            elif getattr(facts, "is_suicide_abetment", False) and candidate.id in ("STAT_302_IPC", "STAT_304_P1_IPC", "STAT_304_P2_IPC", "STAT_307_IPC", "STAT_379_IPC", "STAT_392_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Victim died by suicide; direct homicide/theft inapplicable."
+
+            elif candidate.id == "STAT_306_IPC" and not getattr(facts, "is_suicide_abetment", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 306 requires suicide committed by victim."
+
+            # NDPS Act
+            elif getattr(facts, "is_ndps_narcotics", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_420_IPC", "STAT_406_IPC", "STAT_506_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Possession of commercial narcotics governed by NDPS Act."
+
+            elif candidate.id == "STAT_NDPS_21" and not getattr(facts, "is_ndps_narcotics", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 21 NDPS Act requires narcotic drugs or psychotropic substances."
+
+            # Cheque Dishonour
+            elif getattr(facts, "is_cheque_dishonour", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_302_IPC", "STAT_506_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Governed by Section 138 NI Act."
+
+            elif candidate.id == "STAT_NI_138" and not getattr(facts, "is_cheque_dishonour", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 138 NI Act requires cheque dishonour."
+
+            # Extortion
+            elif getattr(facts, "is_extortion", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_420_IPC", "STAT_406_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Putting in fear to extort property is governed by Section 384 Extortion."
+
+            elif candidate.id == "STAT_384_IPC" and not getattr(facts, "is_extortion", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 384 requires putting in fear to extort property."
+
+            # Acid Attack
+            elif getattr(facts, "is_acid_attack", False) and candidate.id in ("STAT_323_IPC", "STAT_324_IPC", "STAT_326_IPC", "STAT_307_IPC") and candidate.id != "STAT_326A_IPC":
+                is_disqualified = True
+                rejection_reason = "Disqualified: Grievous hurt by acid is specifically governed by Section 326A IPC."
+
+            elif candidate.id == "STAT_326A_IPC" and not getattr(facts, "is_acid_attack", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 326A requires use of acid or corrosive substance."
+
+            # Kidnapping for Ransom
+            elif getattr(facts, "is_kidnapping_ransom", False) and candidate.id in ("STAT_506_IPC", "STAT_384_IPC", "STAT_420_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Kidnapping/abduction with ransom demand is governed by Section 364A."
+
+            elif candidate.id == "STAT_364A_IPC" and not getattr(facts, "is_kidnapping_ransom", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 364A requires kidnapping or abduction for ransom."
+
+            # Cyber Phishing / Personation
+            elif getattr(facts, "is_cyber_phishing", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_406_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Cheating by personation using computer resource is governed by Section 66D IT Act."
+
+            elif candidate.id == "STAT_IT_66D" and not getattr(facts, "is_cyber_phishing", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 66D IT Act requires cheating by personation using computer device."
+
+            # Hate Speech (Section 153A IPC / Section 196 BNS)
+            elif getattr(facts, "is_hate_speech_153a", False) and candidate.id in ("STAT_506_IPC", "STAT_500_IPC", "STAT_420_IPC", "STAT_379_IPC", "STAT_307_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Promoting enmity between different religious/social groups is governed by Section 153A."
+
+            elif candidate.id == "STAT_153A_IPC" and not getattr(facts, "is_hate_speech_153a", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 153A requires promoting enmity between different groups or hate speech."
+
+            # Arms Act (Section 25 Arms Act, 1959)
+            elif getattr(facts, "is_arms_act", False) and candidate.id in ("STAT_506_IPC", "STAT_379_IPC", "STAT_392_IPC", "STAT_307_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Unlawful possession of prohibited firearm without licence is governed by Section 25 Arms Act."
+
+            elif candidate.id == "STAT_ARMS_25" and not getattr(facts, "is_arms_act", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 25 Arms Act requires unlicensed possession of arms or ammunition."
+
+            # Sexual harassment: Non-penetrative unwelcome remarks/advances (Section 354A)
+            elif getattr(facts, "is_sexual_harassment", False) and candidate.id in ("STAT_376_IPC", "STAT_498A_IPC", "STAT_506_IPC") and not facts.is_matrimonial and not facts.is_sexual_offence:
+                is_disqualified = True
+                rejection_reason = "Disqualified: Non-penetrative workplace sexual harassment governed by Section 354A."
+
+            elif candidate.id == "STAT_354A_IPC" and facts.is_sexual_offence:
+                is_disqualified = True
+                rejection_reason = "Disqualified: Penetrative assault elevates offence to Section 376."
+
+            # CBT by Public Servant/Banker (Section 409)
+            elif getattr(facts, "is_cbt_public_servant_banker", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_420_IPC", "STAT_406_IPC", "STAT_408_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Criminal breach of trust by public servant/banker is specifically governed by Section 409."
+
+            elif candidate.id == "STAT_409_IPC" and not getattr(facts, "is_cbt_public_servant_banker", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 409 requires entrustment in capacity of public servant, banker, or agent."
+
+            # Arson / Mischief by Fire (Section 436)
+            elif getattr(facts, "is_arson_fire", False) and candidate.id in ("STAT_379_IPC", "STAT_447_IPC", "STAT_457_IPC", "STAT_506_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Arson / mischief by fire to building is governed by Section 436."
+
+            elif candidate.id == "STAT_436_IPC" and not getattr(facts, "is_arson_fire", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 436 requires mischief by fire to house or building."
+
+            # Kidnapping from Lawful Guardianship (Section 363)
+            elif getattr(facts, "is_kidnapping_lawful_guardian", False) and candidate.id in ("STAT_364A_IPC", "STAT_379_IPC", "STAT_506_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Kidnapping from lawful guardianship without ransom is governed by Section 363."
+
+            elif candidate.id == "STAT_363_IPC" and not getattr(facts, "is_kidnapping_lawful_guardian", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 363 requires taking or enticing minor out of keeping of lawful guardian."
+
+            # Stalking (Section 354D)
+            elif getattr(facts, "is_stalking", False) and candidate.id in ("STAT_354A_IPC", "STAT_376_IPC", "STAT_506_IPC", "STAT_447_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Persistent following or monitoring of woman is governed by Section 354D Stalking."
+
+            elif candidate.id == "STAT_354D_IPC" and not getattr(facts, "is_stalking", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 354D requires persistent following or electronic monitoring."
+
+            # Causing Disappearance of Evidence (Section 201)
+            elif getattr(facts, "is_destruction_of_evidence", False) and candidate.id in ("STAT_302_IPC", "STAT_304_P1_IPC", "STAT_379_IPC", "STAT_506_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Screening offender or causing disappearance of evidence is governed by Section 201."
+
+            elif candidate.id == "STAT_201_IPC" and not getattr(facts, "is_destruction_of_evidence", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 201 requires causing disappearance of evidence to screen offender."
+
+            # Counterfeiting Currency Notes FICN (Section 489A)
+            elif getattr(facts, "is_counterfeit_currency", False) and candidate.id in ("STAT_420_IPC", "STAT_468_IPC", "STAT_471_IPC", "STAT_379_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Counterfeiting currency notes or banknotes is specifically governed by Section 489A."
+
+            elif candidate.id == "STAT_489A_IPC" and not getattr(facts, "is_counterfeit_currency", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 489A requires counterfeiting currency notes or banknotes."
+
             # Domain-targeted protection: Do NOT noise filter candidates directly matched by extracted facts
             domain_protected = False
-            if facts.is_intimidation and candidate.id == "STAT_506_IPC":
+            if getattr(facts, "is_defamation", False) and candidate.id == "STAT_500_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_corruption_or_bribery", False) and candidate.id == "STAT_PC_ACT_7":
+                domain_protected = True
+            elif getattr(facts, "is_housebreaking", False) and candidate.id == "STAT_457_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_theft_in_dwelling", False) and candidate.id == "STAT_380_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_robbery_with_hurt", False) and candidate.id in ("STAT_394_IPC", "STAT_392_IPC"):
+                domain_protected = True
+            elif getattr(facts, "is_extortion", False) and candidate.id == "STAT_384_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_acid_attack", False) and candidate.id == "STAT_326A_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_kidnapping_ransom", False) and candidate.id == "STAT_364A_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_cyber_phishing", False) and candidate.id == "STAT_IT_66D":
+                domain_protected = True
+            elif facts.is_intimidation and candidate.id == "STAT_506_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_criminal_trespass", False) and candidate.id == "STAT_447_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_breach_of_trust_clerk_servant", False) and candidate.id == "STAT_408_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_criminal_negligence", False) and candidate.id == "STAT_304A_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_sexual_harassment", False) and candidate.id == "STAT_354A_IPC":
                 domain_protected = True
             elif facts.is_fraud_or_cheating and candidate.id == "STAT_420_IPC":
                 domain_protected = True
@@ -120,11 +364,11 @@ class RelevanceAndConfidenceGate:
                 domain_protected = True
             elif facts.injury_severity == "Simple" and facts.weapon_used and candidate.id == "STAT_324_IPC":
                 domain_protected = True
-            elif facts.death_caused and facts.is_sudden_fight and candidate.id == "STAT_304_P2_IPC":
+            elif facts.death_caused and not getattr(facts, "is_criminal_negligence", False) and facts.is_sudden_fight and candidate.id == "STAT_304_P2_IPC":
                 domain_protected = True
-            elif facts.death_caused and facts.has_premeditation and candidate.id == "STAT_302_IPC":
+            elif facts.death_caused and not getattr(facts, "is_criminal_negligence", False) and facts.has_premeditation and candidate.id == "STAT_302_IPC":
                 domain_protected = True
-            elif facts.death_caused and not facts.is_sudden_fight and candidate.id == "STAT_304_P1_IPC":
+            elif facts.death_caused and not getattr(facts, "is_criminal_negligence", False) and not facts.is_sudden_fight and candidate.id == "STAT_304_P1_IPC":
                 domain_protected = True
             elif facts.death_caused and facts.is_dowry_death and candidate.id == "STAT_304B_IPC":
                 domain_protected = True
@@ -133,6 +377,30 @@ class RelevanceAndConfidenceGate:
             elif facts.is_sexual_offence and candidate.id == "STAT_376_IPC":
                 domain_protected = True
             elif facts.is_matrimonial and not facts.death_caused and candidate.id == "STAT_498A_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_suicide_abetment", False) and candidate.id == "STAT_306_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_ndps_narcotics", False) and candidate.id == "STAT_NDPS_21":
+                domain_protected = True
+            elif getattr(facts, "is_cheque_dishonour", False) and candidate.id == "STAT_NI_138":
+                domain_protected = True
+            elif getattr(facts, "is_pocso_child_abuse", False) and candidate.id in ("STAT_POCSO_6", "STAT_376_IPC"):
+                domain_protected = True
+            elif getattr(facts, "is_hate_speech_153a", False) and candidate.id == "STAT_153A_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_arms_act", False) and candidate.id == "STAT_ARMS_25":
+                domain_protected = True
+            elif getattr(facts, "is_cbt_public_servant_banker", False) and candidate.id == "STAT_409_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_arson_fire", False) and candidate.id == "STAT_436_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_kidnapping_lawful_guardian", False) and candidate.id == "STAT_363_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_stalking", False) and candidate.id == "STAT_354D_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_destruction_of_evidence", False) and candidate.id == "STAT_201_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_counterfeit_currency", False) and candidate.id == "STAT_489A_IPC":
                 domain_protected = True
 
             # Low relevance or insufficient ingredient fulfillment check
@@ -158,6 +426,32 @@ class RelevanceAndConfidenceGate:
         # Check attempt and overt acts towards murder before general death check
         if "attempt" in ing or "overt_act" in ing or "causing_death_if_not_prevented" in ing:
             return "attempt_to_murder" in facts.extracted_tokens or (facts.weapon_used and facts.injury_severity == "Grievous")
+
+        if "enmity" in ing or "disharmony" in ing or "public_tranquillity" in ing or "spoken_or_written" in ing:
+            return getattr(facts, "is_hate_speech_153a", False)
+        if "firearm" in ing or "ammunition" in ing or "licence" in ing or "arms" in ing:
+            return getattr(facts, "is_arms_act", False)
+        if "public_servant" in ing or "banker" in ing or "capacity_of_public_servant" in ing or "merchant_banker" in ing:
+            return getattr(facts, "is_cbt_public_servant_banker", False)
+        if "fire" in ing or "combustible" in ing or "destruction_of_house" in ing:
+            return getattr(facts, "is_arson_fire", False)
+        if "taking_or_enticing" in ing or "lawful_guardian" in ing or "out_of_keeping" in ing:
+            return getattr(facts, "is_kidnapping_lawful_guardian", False)
+        if "stalking" in ing or "follows_a_woman" in ing or "monitors_the_use" in ing:
+            return getattr(facts, "is_stalking", False)
+        if "disappearance_of_evidence" in ing or "screening_offender" in ing or "concealing_evidence" in ing:
+            return getattr(facts, "is_destruction_of_evidence", False)
+        if "counterfeit" in ing or "currency_note" in ing or "banknote" in ing:
+            return getattr(facts, "is_counterfeit_currency", False)
+
+        if "suicide" in ing or "abetment" in ing or "instigation" in ing:
+            return getattr(facts, "is_suicide_abetment", False)
+        if "narcotics" in ing or "contraband" in ing or "heroin" in ing or "diacetylmorphine" in ing:
+            return getattr(facts, "is_ndps_narcotics", False)
+        if "cheque" in ing or "insufficient_funds" in ing or "notice" in ing or "failure_to_pay" in ing:
+            return getattr(facts, "is_cheque_dishonour", False)
+        if "child" in ing or "trust" in ing or "teacher" in ing:
+            return getattr(facts, "is_pocso_child_abuse", False)
 
         if "death" in ing:
             return facts.death_caused
@@ -185,12 +479,20 @@ class RelevanceAndConfidenceGate:
             return facts.is_forgery
         if "breach_of_trust" in ing or "entrustment" in ing or "custody" in ing or "dominion" in ing:
             return facts.is_breach_of_trust
+        if "clerk" in ing or "servant" in ing or "employee" in ing:
+            return getattr(facts, "is_breach_of_trust_clerk_servant", False)
+        if "rash" in ing or "negligent" in ing or "absence_of_intention" in ing:
+            return getattr(facts, "is_criminal_negligence", False)
+        if "unwelcome_sexual" in ing or "sexual_harassment" in ing:
+            return getattr(facts, "is_sexual_harassment", False)
         if "cruelty" in ing or "husband" in ing:
             return facts.is_matrimonial
         if "dowry" in ing:
             return facts.is_dowry_death
         if "intimidation" in ing or "threat" in ing or "alarm" in ing or "compel" in ing:
             return facts.is_intimidation
+        if "trespass" in ing or "unlawful_entry" in ing:
+            return getattr(facts, "is_criminal_trespass", False)
         if "civil" in ing or "commercial" in ing:
             return facts.is_commercial_civil_dispute
         if "several_persons" in ing or "common_intention" in ing:

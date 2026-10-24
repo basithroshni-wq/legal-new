@@ -35,13 +35,38 @@ class AtomicFacts(BaseModel):
     fraudulent_inducement_at_inception: bool = False
     is_forgery: bool = False
     is_breach_of_trust: bool = False
+    is_breach_of_trust_clerk_servant: bool = False
+    is_criminal_negligence: bool = False
     
     # Matrimonial & Special Categories
     is_matrimonial: bool = False
     is_dowry_death: bool = False
     marriage_years: Optional[float] = None
     is_sexual_offence: bool = False
+    is_sexual_harassment: bool = False
     is_intimidation: bool = False
+    is_criminal_trespass: bool = False
+    is_defamation: bool = False
+    is_housebreaking: bool = False
+    is_theft_in_dwelling: bool = False
+    is_robbery_with_hurt: bool = False
+    is_corruption_or_bribery: bool = False
+    is_suicide_abetment: bool = False
+    is_ndps_narcotics: bool = False
+    is_cheque_dishonour: bool = False
+    is_pocso_child_abuse: bool = False
+    is_extortion: bool = False
+    is_acid_attack: bool = False
+    is_kidnapping_ransom: bool = False
+    is_cyber_phishing: bool = False
+    is_hate_speech_153a: bool = False
+    is_arms_act: bool = False
+    is_cbt_public_servant_banker: bool = False
+    is_arson_fire: bool = False
+    is_kidnapping_lawful_guardian: bool = False
+    is_stalking: bool = False
+    is_destruction_of_evidence: bool = False
+    is_counterfeit_currency: bool = False
     
     # Parties & Procedure
     accused_count: int = 1

@@ -86,7 +86,8 @@ class ScopedFactExtractor:
             "induced", "dishonestly", "brochures", "allotment", "crores", "lakhs", "deceived",
             "recruitment", "visa", "counterfeit", "conspiracy", "conspired", "harassed",
             "intercourse", "molested", "outraged", "groped", "theft", "stole", "robbery",
-            "dacoity", "custodian", "embezzled", "misappropriated"
+            "dacoity", "custodian", "embezzled", "misappropriated", "gratification", "bribe",
+            "bribery", "vigilance", "trap"
         }
 
         matched_legal = sum(1 for w in words if w in legal_terms)
@@ -101,7 +102,118 @@ class ScopedFactExtractor:
         nature_matches = sum(1 for w in nature_words if w in lower)
         corp_matches = sum(1 for phrase in corporate_finance if phrase in lower)
 
-        if matched_legal == 0:
+        # Check explicit non-penal civil / constitutional / family / labour / commercial / administrative litigation first
+        has_active_crime = bool(re.search(r"\b(charged with (?:murder|rape|theft|robbery|dacoity|cheating|forgery)|fir registered|fir lodged|chargesheet|arrested for (?:murder|rape|theft|robbery|dacoity)|criminal complaint alleging (?:cheating|breach)|penal code|bns 2023|ipc 1860|indian penal code)\b", lower))
+        
+        non_penal_domains = [
+            # Contract & Property Law
+            (r"\b(promissory note|suit for recovery of money|recovery of money.*promissory note|duly executed promissory note)\b", "Negotiable Instruments / Civil Law (Suit for Money Recovery on Promissory Note)"),
+            (r"\b(encroach\w*.*(?:boundary|plot|private property)|boundary wall encroaching|licensed surveyor'?s? report|surveyor'?s? report confirms the encroachment)\b", "Civil Property Law (Suit for Injunction & Encroachment)"),
+            (r"\b(challenges? a will|will dispute|declaratory suit — will|testamentary capacity|testator signed voluntarily|mild cognitive impairment but not legal incapacity|probate of will)\b", "Indian Succession Act, 1925 (Declaratory Suit Challenging Will)"),
+            (r"\b(compound wall collapsed|defective construction by the contractor|suit for damages — negligent construction|under-reinforced and would not have withstood|negligent construction)\b", "Law of Torts / Civil Law (Suit for Damages for Defective Construction)"),
+            (r"\b(easement rights|easement by prescription|right of way|landlocked and accessible only through|path across the defendant'?s? land|used by licence, not as of right)\b", "Indian Easements Act, 1882 (Easement by Prescription / Right of Way)"),
+            (r"\b(specific performance of contract|refused to execute the sale deed|specific relief act)\b", "Specific Relief Act, 1963 (Specific Performance of Contract)"),
+            (r"\b(agreement to sell ancestral property|ancestral property.*one brother signed|property is undivided and no partition|transfer his half share)\b", "Specific Relief Act, 1963 / Transfer of Property Act (Agreement to Sell Undivided Ancestral Property)"),
+            (r"\b(suit for partition|partition of joint family property|partition and accounts|died intestate.*leaving behind two wives|died intestate)\b", "Civil Property Law (Suit for Partition of Joint Family Property)"),
+            (r"\b(breach of contract — construction|structural deficiencies.*correctable|contractual withholding)\b", "Commercial Contract Law (Construction Contract Dispute)"),
+            (r"\b(adverse possession|continuous and uninterrupted possession.*pucca structure|suit for recovery of possession)\b", "Civil Property Law (Suit based on Adverse Possession)"),
+            (r"\b(rent control|eviction petition|vacant possession|tenant.*eviction|landlord.*eviction|bona fide.*necessity|rent-controlled tenancy|landlord seeks eviction)\b", "Rent Control Legislation (Landlord-Tenant Eviction)"),
+            (r"\b(mortgage foreclosure|sarfaesi proceedings|housing loan.*defaulted)\b", "Banking & SARFAESI Act, 2002 (Mortgage Foreclosure)"),
+            
+            # Family Law
+            (r"\b(mutual consent|dissolution of marriage|section 13b|hindu marriage act.*13b|alimony|divorce)\b", "Hindu Marriage Act, 1955 (Section 13B Mutual Consent Divorce & Alimony)"),
+            (r"\b(pwdva|protection order \(pwdva|domestic violence — protection order|shelter home with her two children|alienating the children|protection of women from domestic violence)\b", "Protection of Women from Domestic Violence Act, 2005 (PWDVA Application for Protection Order)"),
+            (r"\b(guardianship — nri|nri father.*guardianship|guardianship of his \d+-year-old|interviewed in chambers.*expressed a preference to stay with his mother)\b", "Guardians and Wards Act, 1890 (Child Custody and Guardianship Dispute)"),
+            (r"\b(second wife'?s? claim|succession — intestate|disputed as bigamous|biological father of all children.*nominee in his insurance|dna testing confirms the man was the biological father)\b", "Indian Succession Act, 1925 / Hindu Succession Act (Intestate Succession & Second Wife's Claim)"),
+            (r"\b(maintenance for major disabled child|cerebral palsy.*maintenance|disabled child.*section 125|maintenance from his estranged father under section 125)\b", "Family / Quasi-Civil Law (CrPC Section 125 - Maintenance for Adult Disabled Child)"),
+            (r"\b(petitions for divorce|hindu marriage act section 13|divorce — cruelty|refused to cohabit)\b", "Family Law (Hindu Marriage Act Section 13 - Divorce Petition)"),
+            (r"\b(child custody dispute|parents.*divorcing.*custody|child psychologist.*custody)\b", "Family Law (Guardians and Wards Act - Child Custody Dispute)"),
+            (r"\b(maintenance \(crpc section 125\)|section 125 crpc|deserted by (?:her|his) husband|desertion|capable of earning.*mobility|limiting her mobility)\b", "Family / Quasi-Civil Law (CrPC Section 125 - Maintenance Claim)"),
+            (r"\b(restitution of conjugal rights|hma section 9)\b", "Family Law (Hindu Marriage Act Section 9 - Restitution of Conjugal Rights)"),
+            (r"\b(triple talaq.*iddat|muslim personal law.*maintenance during the iddat)\b", "Muslim Personal Law / Family Law (Maintenance Claim)"),
+            
+            # Consumer & Labour Law
+            (r"\b(builder delay \(rera\)|possession was not given until.*delay of \d+ months|promised possession by.*rera registration|rera|real estate regulatory authority|delayed possession.*builder|refund of flat booking.*rera|possession delay.*rera)\b", "Real Estate (Regulation and Development) Act, 2016 (RERA Consumer Delay Claim)"),
+            (r"\b(wrongful dismissal — whistleblower|reported financial irregularities in his company to the roc|whistleblower|termination came \d+ weeks after his complaint|appraisals were all ['\"]good['\"])\b", "Corporate & Employment Law (Whistleblower Protection / Wrongful Dismissal)"),
+            (r"\b(posh act|internal complaints committee|icc findings|icc had no external member|sexual harassment at workplace \(posh)\b", "Sexual Harassment of Women at Workplace Act, 2013 (POSH Act - ICC Inquiry Challenge)"),
+            (r"\b(educational institution fee refund|fee refund.*ugc|ugc guidelines mandate a refund|no refund after admission.*autonomous university)\b", "Consumer Protection Act, 2019 / UGC Guidelines (Educational Fee Refund Dispute)"),
+            (r"\b(esi / pf dispute|epfo conducted an inspection|epfo|contract workers.*epf registration|workers were effectively under the company'?s? control)\b", "Labour Law (EPFO / EPF Act, 1952 - Contract Workers Dispute)"),
+            (r"\b(insurance claim repudiat\w*|repudiat\w*.*(?:insurance|claim|policy)|insurer repudiated|damaged in a flood.*insurance claim|private vehicle policy)\b", "Consumer Protection Act, 2019 (Insurance Repudiation Dispute)"),
+            (r"\b(medical negligence|routine appendectomy.*surgical sponge|surgical count record)\b", "Consumer Protection Act, 2019 (Medical Negligence Complaint)"),
+            (r"\b(employee'?s? compensation|workm[ae]n'?s? compensation|commissioner for workmen|machine crush injury|industrial.*compensation|lost.*fingers.*machine)\b", "Labour Law (Employees' Compensation Act, 1923)"),
+            (r"\b(unfair labour practice|wrongful termination|permanent employee.*restructuring.*domestic inquiry)\b", "Labour Law (Industrial Disputes Act, 1947)"),
+            (r"\b(e-commerce defective product|refrigerator online.*stopped working|warranty card guaranteed)\b", "Consumer Protection Act, 2019 (Defective Goods Complaint)"),
+            
+            # Constitutional & Public Law
+            (r"\b(aadhaar linkage|mandating aadhaar linkage for receiving pension|biometric authentication failures|right to privacy under article 21.*aadhaar)\b", "Constitutional Law (Article 226/32 Writ - Aadhaar Linkage & Privacy under Art. 21)"),
+            (r"\b(pil — condition of undertrial prisoners|undertrial prisoners|facility designed for \d+, with no segregation|overcrowding, inadequate sanitation, and absence of legal aid|court-appointed committee'?s? inspection report confirms overcrowding)\b", "Constitutional Law (Article 32/226 PIL - Undertrial Prisoners' Rights)"),
+            (r"\b(arbitrary transfer of government employee|writ — arbitrary transfer|transferred to a remote posting.*notice|administrative exigency with no further reasons.*similarly situated|transfer is punitive)\b", "Service / Administrative Law (Article 226 Writ Petition - Challenge to Punitive Transfer)"),
+            (r"\b(land acquisition act 2013|land acquisition — inadequate compensation|compensation awarded under the land acquisition|circle rates.*sale deeds of comparable land|multiplier and solatium were correctly applied)\b", "Right to Fair Compensation in Land Acquisition Act, 2013 (Compensation Reference)"),
+            (r"\b(writ of habeas corpus|detained under the national security act|detention order cited vague grounds)\b", "Constitutional Law (Article 32/226 - Writ of Habeas Corpus)"),
+            (r"\b(writ of mandamus|rti applicant|public information officer|central information commission)\b", "Constitutional / Administrative Law (Writ of Mandamus - RTI Act, 2005)"),
+            (r"\b(service law|promotion dispute|departmental promotion committee|superseded for promotion)\b", "Service Jurisprudence (Article 226 - Public Employment Promotion Dispute)"),
+            (r"\b(writ for pollution control|state pollution control board|untreated effluent into a nearby river)\b", "Environmental Law (Article 226/32 PIL - Water Pollution Control)"),
+            
+            # Banking & Commercial Recovery
+            (r"\b(personal guarantee|director of a company in his personal capacity as guarantor|guarantor for a ₹?.*loan|guarantee is unenforceable because the bank altered the loan terms|guarantee deed contains a clause permitting variations)\b", "Commercial Banking & Contract Law (Recovery Suit Against Personal Guarantor / DRT)"),
+            (r"\b(corporate insolvency resolution process|corporate resolution \(ibc 2016\)|committee of creditors|resolution plans)\b", "Insolvency and Bankruptcy Code, 2016 (IBC - Corporate Insolvency)"),
+            
+            # Intellectual Property
+            (r"\b(patent infringement|patent for a drug formulation|generic manufacturer launched a product with an identical active compound|crystalline form not covered by the patent|crystalline structure is distinct)\b", "Intellectual Property Law (Patents Act, 1970 - Pharmaceutical Patent Infringement)"),
+            (r"\b(trademark passing off|passing off|trademark infringement|unfair competition|trade dress|deceptive color schemes|registered trademark|phonetically distinct|unregistered trade dress|red-and-white chequered interior design)\b", "Intellectual Property Law (Trade Marks Act, 1999)"),
+            (r"\b(copyright infringement|copied the source code|structural similarity in code)\b", "Intellectual Property Law (Copyright Act, 1957)"),
+            (r"\b(trademark dispute|registered trademark.*suprafit|phonetically distinct|market surveys showed consumer confusion)\b", "Intellectual Property Law (Trade Marks Act, 1999)"),
+            
+            # Motor Accident Claims
+            (r"\b(motor accident — permanent disability|bus that jumped a footpath.*amputation of his left leg|returned to work with a prosthetic limb|loss of earning capacity, pain, and future medical expenses)\b", "Motor Vehicles Act, 1988 (MACT Permanent Disability & Amputation Claim)"),
+            (r"\b(motor accident — uninsured vehicle|killed by a tractor that had no valid insurance|solatium fund|motor accident claims tribunal seeking compensation from the solatium fund)\b", "Motor Vehicles Act, 1988 (MACT Compensation / Solatium Fund Claim for Uninsured Vehicle)"),
+            (r"\b(motor accident claim|daily wage labourer.*speeding truck|speeding truck.*claimants|mact|motor accident|claimants.*(?:sought|claim|filed)|fatal road accident.*claim)\b", "Motor Vehicles Act, 1988 (MACT Compensation Claim)"),
+            (r"\b(contributory negligence.*car ran a red light|not wearing a helmet and was slightly over the speed limit)\b", "Motor Vehicles Act, 1988 (MACT Contributory Negligence Claim)"),
+            
+            # Arbitration & Commercial Contracts
+            (r"\b(enforcement of foreign award|singapore-seated arbitral tribunal|section 48 of the arbitration act|violates indian public policy.*payment in foreign currency|procedural requirements of the new york convention)\b", "Arbitration and Conciliation Act, 1996 (Part II, Section 48 - Enforcement of Foreign Arbitral Award)"),
+            (r"\b(franchise agreement termination|franchisor terminated a franchise agreement|violations of brand standards documented over|unilateral termination clause on material breach)\b", "Commercial Contract Law (Specific Relief Act / Indian Contract Act - Franchise Termination Dispute)"),
+            (r"\b((?:section|u/s)\s+34.*arbitration|arbitration and conciliation act|set aside.*arbitral award|domestic arbitral award|arbitration section 34|challenge to arbitral award|sole arbitrator awarded|sole arbitrator)\b", "Arbitration Law (Arbitration and Conciliation Act, 1996 - Section 34 Challenge)"),
+            (r"\b(purely civil commercial|commercial contract dispute|dispute arose between commercial business partners|invoice reconciliation.*no deceptive|commercial dispute — goods not delivered|force majeure clause requires notification|supply of industrial machinery.*advance|force majeure)\b", "Commercial Contract Law (Pure Commercial Contract Dispute)"),
+            
+            # Environmental & Land Law
+            (r"\b(forest land encroachment|suit for eviction of \d+ tribal families|scheduled tribes and other traditional forest dwellers|forest rights act, 2006|notified as reserved forest in \d+)\b", "Environmental & Forest Law (Scheduled Tribes & Forest Dwellers Act, 2006 / Reserved Forest Eviction)"),
+            (r"\b(national green tribunal|ngt act|ngt\b|section 14.*national green tribunal|environmental application|polluting local water bodies|state pollution control board|untreated effluent|untreated industrial chemical|coastal regulation zone|crz notification|resort within 100 metres of the high tide line|crz-i area|coastal zone management authority|construction is within the prohibited zone)\b", "Environmental Law (National Green Tribunal Act, 2010 / Environment Protection Act)"),
+            
+            # Additional Novel Non-Penal Regimes
+            (r"\b(pmla|prevention of money laundering act|provisional attachment.*proceeds of crime|enforcement directorate.*attached|appellate tribunal for pmla)\b", "Prevention of Money Laundering Act, 2002 (PMLA Provisional Attachment)"),
+            (r"\b(electricity act|meter tampering|electricity theft|unauthorized.*extraction of electricity|tariff assessment.*electricity|section 135.*electricity|section 126.*electricity)\b", "Electricity Act, 2003 (Special Court Power Theft Dispute)"),
+            (r"\b(mmdr act|illegal sand mining|mining lease cancellation|unauthorized quarrying|district mineral foundation)\b", "Mines and Minerals (Development and Regulation) Act, 1957 (Mining Lease Dispute)"),
+            (r"\b(admiralty jurisdiction|arrest of (?:the )?(?:cargo |foreign )?vessel|unpaid bunker fuel|maritime lien)\b", "Admiralty (Jurisdiction and Settlement of Maritime Claims) Act, 2017 (Vessel Arrest)"),
+            (r"\b(carriage by air act|delayed international flight.*lost baggage|montreal convention.*baggage compensation)\b", "Carriage by Air Act, 1972 (Aviation Baggage & Flight Delay Compensation)"),
+            (r"\b(section 94 ibc|personal insolvency.*individual debtor|debt resolution process.*insolvent debtor)\b", "Insolvency and Bankruptcy Code, 2016 (Personal Insolvency Resolution)"),
+            (r"\b(court martial|summary general court martial|dismissal from army service.*aft|court-martial proceedings challenged)\b", "Armed Forces Tribunal Act, 2007 (Court Martial Conviction Appeal)"),
+            (r"\b(wildlife\s*(?:\(protection\)\s*)?act|biological specimens|chief wildlife warden|schedule i.*species|poaching|forest department.*seized)\b", "Wildlife Protection Act, 1972 (Wildlife Conservation Offence)"),
+            (r"\b(section 66a it act|shreya singhal|struck down as unconstitutional.*66a|quashing of fir registered under section 66a)\b", "Information Technology Act, 2000 (Section 66A Void / Unconstitutional Quashing)"),
+            (r"\b(geographical indications|gi tag infringement|geographical indications of goods act|unauthorized use of darjeeling)\b", "Geographical Indications of Goods Act, 1999 (GI Infringement)"),
+            (r"\b(pvpfra|plant varieties and farmers' rights|registered crop variety infringement|seed certification dispute)\b", "Protection of Plant Varieties and Farmers' Rights Act, 2001 (PVPFRA Dispute)"),
+            (r"\b(sarfaesi|securiti[sz]ation|debts recovery tribunal|drt\b|section 17.*sarfaesi|possession notice.*auction)\b", "SARFAESI Act, 2002 (Section 17 Securitisation Application before DRT)"),
+            (r"\b(revocation of project registration.*rera|diverted 70% of collections from escrow|rera section 7 revocation)\b", "Real Estate (Regulation and Development) Act, 2016 (Section 7 Registration Revocation)"),
+            
+            # Regulatory Tribunals
+            (r"\b(tdsat|telecom disputes settlement|interconnection agreement|spectrum usage charges)\b", "Telecom Disputes Settlement and Appellate Tribunal (TDSAT Regulatory Dispute)"),
+            (r"\b(cestat|customs duty.*valuation|classification of imported|excise tariff appeal)\b", "Customs, Excise and Service Tax Appellate Tribunal (CESTAT Tariff Appeal)"),
+            (r"\b(armed forces tribunal|disability pension claim|military service disability|aft act)\b", "Armed Forces Tribunal Act, 2007 (AFT Disability Pension Dispute)"),
+            (r"\b(central administrative tribunal|inter-se seniority|cadre promotion dispute|section 19 administrative tribunals act)\b", "Administrative Tribunals Act, 1985 (CAT Public Employment Seniority Dispute)"),
+            (r"\b(competition commission of india|abuse of dominant position|anti-competitive agreement|section 3 competition act)\b", "Competition Act, 2002 (CCI Antitrust Regulatory Injunction)")
+        ]
+        
+        if not has_active_crime:
+            for pat, label in non_penal_domains:
+                if re.search(pat, lower):
+                    return {
+                        "is_ood": True,
+                        "reason": f"Non-Penal Jurisdiction: Governed by {label}, disclosing no cognizable criminal offence under IPC/BNS."
+                    }
+
+        has_any_legal_allegation = matched_legal > 0 or bool(re.search(r"\b(accused|victim|complainant|police|fir|alleg\w*|charg\w*|court|offence|penal|crime|criminal|suit|petition\w*|respondent|appellant|plaintiff|defendant|pocso|sexual|harass\w*|assault\w*|stolen|theft|rob\w*|extort\w*|dacoit\w*|cheat\w*|fraud\w*|forg\w*|bribe\w*|corrupt\w*|gratification|vigilance|trap\b|ndps|contraband|narcotic|murder|kill\w*|injur\w*|hurt|stab\w*|weapon|knife|pistol|firearm|death|died|deceased|dowry|cruelty|suicide|cheque|dishonour|dispute|contract|agreement|tenan\w*|landlord|evict\w*|rent|partition|possession|compensat\w*|damages|writ|mandamus|habeas|tribunal|arbitrat\w*|mact|quash\w*|promissory|encroach\w*|will|testat\w*|easement|alimony|custody|guardianship|succession|whistleblower|posh|patent|trademark|trade dress|solatium|franchis\w*|forest\w*|crz|aadhaar|pension|undertrial\w*|transfer\w*|pmla|proceeds of crime|electricity|mining|admiralty|bunker|vessel|aviation|montreal|court martial|wildlife|poaching|66a|shreya singhal|geographical indication|plant variet\w*|escrow|securitisation)\b", lower))
+
+        if not has_any_legal_allegation:
             return {"is_ood": True, "reason": "Text contains zero cognizable criminal or civil legal allegations."}
 
         if weather_matches >= 2 and matched_legal <= 1:
@@ -148,12 +260,37 @@ class ScopedFactExtractor:
         fraudulent_inducement_at_inception = False
         is_forgery = False
         is_breach_of_trust = False
+        is_breach_of_trust_clerk_servant = False
+        is_criminal_negligence = False
 
         is_matrimonial = False
         is_dowry_death = False
         marriage_years: Optional[float] = None
         is_sexual_offence = False
+        is_sexual_harassment = False
         is_intimidation = False
+        is_criminal_trespass = False
+        is_defamation = False
+        is_housebreaking = False
+        is_theft_in_dwelling = False
+        is_robbery_with_hurt = False
+        is_corruption_or_bribery = False
+        is_suicide_abetment = False
+        is_ndps_narcotics = False
+        is_cheque_dishonour = False
+        is_pocso_child_abuse = False
+        is_extortion = False
+        is_acid_attack = False
+        is_kidnapping_ransom = False
+        is_cyber_phishing = False
+        is_hate_speech_153a = False
+        is_arms_act = False
+        is_cbt_public_servant_banker = False
+        is_arson_fire = False
+        is_kidnapping_lawful_guardian = False
+        is_stalking = False
+        is_destruction_of_evidence = False
+        is_counterfeit_currency = False
 
         accused_count = 1
         has_common_intention = False
@@ -195,23 +332,31 @@ class ScopedFactExtractor:
             weapon_source = "Pre-arranged/Carried"
 
         # --- 2. Injury & Death Scoping (Fix F-02) ---
-        victim_survived = bool(re.search(r"\b(surviv\w*|sav\w*|out of danger|resuscitated|pulled (?:him|her|the victim )?back|underwent (?:emergency )?(?:surgery|laparotomy|thoracotomy)|discharged|recovered|timely (?:medical|vascular|surgical) (?:aid|intervention|repair))\b", lower))
+        victim_survived = bool(re.search(r"\b(surviv\w*|sav\w*|out of danger|resuscitated|pulled (?:him|her|the victim )?back|underwent (?:emergency )?(?:surgery|laparotomy|thoracotomy)|discharged|timely (?:medical|vascular|surgical) (?:aid|intervention|repair)|(?:victim|patient|injured|complainant)\s+recovered|recovered from (?:injuries|hospital|wounds))\b", lower))
         is_threat_or_intent_of_death = bool(re.search(r"\b(death threats?|threats? of (?:immediate |instant )?death|threaten\w* (?:to kill|with death|to shoot|with dire consequences)|intend\w* (?:his|her|their)?\s*death|shoot (?:you|him|her|them) dead|will shoot you dead)\b", lower))
-        is_natural_death = bool(re.search(r"\b(natural (?:causes|myocardial infarction|heart attack|illness|disease)|post-mortem.*natural|no external marks of violence)\b", lower))
+        is_natural_death = (bool(re.search(r"\b(natural (?:causes|myocardial infarction|heart attack|illness|disease)|post-mortem\b[^\n\r.]*\b(?<!un)natural\s+death|no external marks of violence|died intestate|died of natural causes|died peacefully)\b", lower)) and not bool(re.search(r"\bunnatural\b", lower)))
 
         # Explicit negation of fatality: "no fatal injury", "not fatal", "without fatality"
         is_negated_fatal = bool(re.search(r"\b(no (?:fatal|fatality|death)|not fatal|without (?:any )?(?:fatal|fatality|death)|non-fatal)\b", lower))
 
         # Civil / Will documents mentioning already deceased persons (not homicides caused by accused)
-        is_prior_deceased_relative = bool(re.search(r"\b(deceased (?:witness|attesting witness|testator|uncle|father|mother|brother|sister|parents|husband|relative)|late (?:brother|father|mother|uncle|husband|testator))\b", lower))
+        is_prior_deceased_relative = bool(re.search(r"\b(deceased (?:relative|witness|attesting witness|testator|uncle)|late (?:testator|uncle))\b", lower))
         is_idiomatic_dead = bool(re.search(r"\b(dead of night|death certificate of a living|false death certificate|shoot (?:you|him|her|them) dead)\b", lower)) or is_prior_deceased_relative
+
+        # Suicide scoping: Distinguish self-inflicted death from direct homicide by accused
+        is_suicide = bool(re.search(r"\b(died by suicide|committed suicide|suicide note|died of suicide)\b", lower))
+        has_dowry_claim = bool(re.search(r"\b(dowry|unlawful demand for (?:cash|gold|car|money)|harassed for dowry)\b", lower))
+        if is_suicide and not has_dowry_claim:
+            is_suicide_abetment = True
+            tokens.append("suicide_committed")
+            tokens.append("abetment_or_instigation")
 
         # Accurate Actus Reus Fatality: Must distinguish actual death from threats, survival, negations, or idioms
         has_death_word = (bool(re.search(r"\b(death|died|dead|found dead|succumb\w*|fatal\w*|fatality|fatalities|corpse|post-mortem|autopsy|strangled to death|beaten to death|causing (?:instant |immediate )?death|resulted in death|demise|lethal (?:wounds?|injur\w*|blows?))\b", lower)) and not is_threat_or_intent_of_death)
         has_kill_word = bool(re.search(r"\b(killed|killing|kills)\b", lower)) and not bool(re.search(r"\b(threaten\w* to kill|threat of killing|attempted to kill|intend\w* to kill)\b", lower))
         actual_death_patterns = ((has_death_word or has_kill_word) and not is_idiomatic_dead and not is_negated_fatal and not is_natural_death) or (bool(re.search(r"\b(deceased)\b", lower)) and not is_prior_deceased_relative and not is_idiomatic_dead and not is_negated_fatal and not is_natural_death)
         
-        death_caused = actual_death_patterns and not victim_survived and not is_negated_fatal
+        death_caused = actual_death_patterns and not victim_survived and not is_negated_fatal and not is_suicide_abetment
 
         if death_caused:
             injury_severity = "Fatal"
@@ -220,10 +365,18 @@ class ScopedFactExtractor:
             # Exclude threats of bodily injury and explicit negations from actual grievous hurt
             is_threat_of_hurt = bool(re.search(r"\b(threaten\w* to|threats? of)\b[^.!?]*\b(teeth|fracture|smash|break)\b", lower))
             has_negated_grievous = bool(re.search(r"\b(without\s+(?:any\s+)?[^.!?]*(?:bone involvement|fracture|skeletal fracture|grievous|danger to life|permanent disfigurement|severance|harm)|no\s+[^.!?]*(?:fracture|skeletal fracture|grievous|danger to life|weapons or grievous)|did not cause\s+(?:any\s+)?[^.!?]*(?:fracture|skeletal fracture|grievous|harm|injury)|with no weapons or grievous|no weapons or grievous|or grievous injury)\b", lower))
-            has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid)\b", lower)) and not is_threat_of_hurt and not has_negated_grievous)
-            has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut|cuts|cutting|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze)\b", lower))
+            has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid|cardiac surgery|bullet wound|emergency surgery|fired (?:a )?shot directly at)\b", lower)) and not is_threat_of_hurt and not has_negated_grievous)
+            has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut|cuts|cutting|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze|bleeding\w*|injur\w*)\b", lower))
 
-            if has_grievous:
+            has_attempt = (victim_survived and bool(re.search(r"\b(attempt to murder|fired (?:a )?shot directly at|stabbed (?:in )?(?:the )?chest|murderous intent|overt act towards causing death)\b", lower))) or bool(re.search(r"\b(attempt to murder|section 307\b|section 109 bns)\b", lower))
+
+            if has_attempt and not death_caused:
+                tokens.append("attempt_to_murder")
+                tokens.append("causing_death_if_not_prevented")
+                tokens.append("overt_act_towards_murder")
+                injury_severity = "Grievous"
+                tokens.append("injury_grievous")
+            elif has_grievous:
                 injury_severity = "Grievous"
                 tokens.append("injury_grievous")
             elif has_simple:
@@ -234,7 +387,7 @@ class ScopedFactExtractor:
 
         # --- 3. Premeditation, Intent & Sudden Fight (Fix F-04) ---
         negated_premed = bool(re.search(r"\b(no (?:prior )?(?:enmity|animosity|planning|ill-will)|not planned|unpremeditated|without (?:any )?(?:premeditation|planning|prior (?:enmity|planning))|no long-standing grudge|unscripted argument)\b", lower))
-        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|electoral grudge|threatened revenge|planned in advance|planned the murder|lying in wait|waited for the victim|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|hired (?:two |three )?(?:sharpshooters|contract killers|hitmen)|contract (?:killing|shooters?|hit)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun)|lured.*to (?:eliminate|an abandoned|isolated|warehouse)|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison)|honor killing|deep rancor|rancor|stalked.*(?:victim|deceased|complainant)|decapitat\w*|procured.*(?:machete|knife|weapon|pistol|gun|axe|talwar|crowbar))\b", lower))
+        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|electoral grudge|long-standing (?:land |property |boundary )?dispute|over a (?:long-standing|boundary|property) dispute|threatened revenge|planned in advance|planned the murder|made a plan|lying in wait|waited for the victim|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|hired (?:two |three )?(?:sharpshooters|contract killers|hitmen)|contract (?:killing|shooters?|hit)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun|pesticide|poison|in advance)|lured.*to (?:eliminate|an abandoned|isolated|warehouse)|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison|pesticide)|honor killing|deep rancor|rancor|stalked.*(?:victim|deceased|complainant)|decapitat\w*|procured.*(?:machete|knife|weapon|pistol|gun|axe|talwar|crowbar))\b", lower))
 
         if positive_premed and not negated_premed:
             has_premeditation = True
@@ -242,16 +395,17 @@ class ScopedFactExtractor:
         else:
             has_premeditation = False
 
-        sudden_quarrel = bool(re.search(r"\b(sudden (?:quarrel|fight|altercation|argument|spat|fit of rage|fit of anger)|heat of passion|hot blood|hot words|spontaneous (?:fight|altercation)|impromptu.*(?:brawl|quarrel|fight)|during an argument|unscripted argument|in a sudden quarrel)\b", lower))
+        sudden_quarrel = bool(re.search(r"\b(sudden (?:quarrel|fight|altercation|argument|spat|fit of rage|fit of anger)|road rage(?: altercation)?|altercation|physical altercation|heat of passion|hot blood|hot words|spontaneous (?:fight|altercation)|impromptu.*(?:brawl|quarrel|fight)|during an argument|unscripted argument|in a sudden quarrel)\b", lower))
         if sudden_quarrel or negated_premed:
             is_sudden_fight = True
             heat_of_passion = True
             tokens.append("sudden_fight_heat_of_passion")
 
         is_provocation = bool(re.search(r"\b(grave and sudden provocation|exceeding (?:private defence|right of private defence)|excess of the right of private defence|provocation)\b", lower))
+        is_negligence = bool(re.search(r"\b(rash|negligent|criminal negligence|excessive speed|high speed|speed was well above the limit|speeding|struck (?:a )?pedestrian|hit (?:a )?pedestrian|vehicular accident|reckless driving|failing to exercise reasonable care|hit and run|traffic collision|careless driving|lost control while (?:overtaking|driving|turning)|lorry driver|truck driver|bus driver|motor vehicle)\b", lower))
 
         if death_caused:
-            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck)\b", lower))
+            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|pesticide|laced.*(?:coffee|tea|flask|drink|food)|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck|(?:blunt force |fatal |severe )?injuries to the (?:skull|head)|skull fracture|fractured (?:the )?skull)\b", lower))
             if (has_premeditation or lethal_vital_attack) and not is_sudden_fight and not is_provocation:
                 intention_to_cause_death = True
                 tokens.append("intention_to_cause_death")
@@ -259,28 +413,56 @@ class ScopedFactExtractor:
                 tokens.append("sudden_fight_exception_4")
             elif is_provocation:
                 tokens.append("grave_provocation_or_private_defence_exception")
+            elif is_negligence and not weapon_used and not has_premeditation and not is_sudden_fight and not is_provocation:
+                is_criminal_negligence = True
+                tokens.append("rash_or_negligent_act")
+                tokens.append("absence_of_intention_or_knowledge")
             else:
                 tokens.append("intention_to_cause_death_or_injury_likely_to_cause_death")
 
         # --- 4. Attempt to Murder Scoping (Fix F-02) ---
         if not death_caused:
             is_negated_attempt = bool(re.search(r"\b(did not|had no|without|no)\s+(?:intent\w*|intend\w*)\s+to\s+(?:murder|kill|cause death)\b", lower))
-            attempt_expressions = bool(re.search(r"\b(intent\w* to (?:murder|cause death|kill|eliminate)|intend\w* to (?:murder|cause death|kill|eliminate)|attempted to (?:slit|murder|kill)|aimed and shot|bullet penetrated|shot.*in the (?:chest|abdomen|neck)|fired (?:three )?bullets|slashed.*throat|slashed at (?:her|his|their)?\s*neck|mixed (?:arsenic|poison)|rammed.*against.*pillar|pushed.*into an active railway track|(?:threw|shoved|pushed).*off (?:the |a )?.*terrace|set.*locked shop on fire|strangled.*until he lost consciousness|pipe bomb|stabbed.*(?:thoracic|chest|abdomen|throat).*intending to cause death)\b", lower))
+            attempt_expressions = bool(re.search(r"\b(intent\w* to (?:murder|cause death|kill|eliminate)|intend\w* to (?:murder|cause death|kill|eliminate)|attempted to (?:slit|murder|kill)|aimed and shot|bullet penetrated|shot.*in the (?:chest|abdomen|neck)|fired (?:three )?bullets|slashed.*throat|slashed at (?:her|his|their)?\s*neck|mixed (?:arsenic|poison)|rammed.*against.*pillar|pushed.*into an active railway track|(?:threw|shoved|pushed).*off (?:the |a )?.*terrace|set.*locked shop on fire|strangled.*until he lost consciousness|pipe bomb|stabbed.*(?:thoracic|chest|abdomen|throat).*intending to cause death|fired a (?:country-made |improvised )?(?:pistol|gun|revolver|rifle|firearm)(?: at)?|shot at|fired at|discharged.*firearm|fired.*towards)\b", lower))
             if attempt_expressions and not is_negated_attempt:
                 tokens.append("attempt_to_murder")
                 tokens.append("overt_act_towards_commission_of_murder")
 
         # --- 5. Property Crimes: Theft vs Robbery vs Cheating (Fix F-07) ---
         # Ensure weapon picking (e.g. snatching a scythe/stick from ground) is NOT treated as theft
-        stole_property = bool(re.search(r"\b(stole\w*|theft|thief|took away|took (?:a |the |away|it away)?\s*(?:[a-z]+\s+)?(?:wrist watch|watch|mobile|phone|bag|handbag|backpack|cash|wallet|necklace|jewelry|valuables|ornaments|motorcycle|bike)|shoplift\w*|lifted|pilfer\w*|pickpocket\w*|slid (?:his|her) hand|slipped away with|discreetly removed|concealed.*(?:handbag|backpack|jacket|pocket)|walked out without paying|exited.*without.*pay\w*|slipped.*into.*pocket|removed.*without.*consent|without\s+(?:the\s+)?(?:(?:owner|commuter|victim|anyone)'?s?\s+)?(?:knowledge|consent|permission)|drove away with.*motorcycle|stole.*motorcycle|broke the handlebar lock|forcefully stripped.*of|stripped.*of.*cash|discreetly reached|looted|quietly detached|untied two cows|surreptitiously\s+(?:picked\s+up|removed|took)|merely snatched|snatched\s+(?:a\s+)?(?:purse|wallet|bag|chain|mobile|phone)\s+while\s+running)\b", lower))
-        extortion_or_intimidation = bool(re.search(r"\b(demanded (?:wallet|money|cash|phone|gold|all cash|.*earnings|earnings)|held.*(?:knife|gun|dagger|revolver|pistol|iron rod|sickle|cleaver)|threats? of (?:immediate |instant )?death|held at gunpoint|held at knifepoint|pointed a (?:firearm|revolver|pistol|dagger|knife)|extorted|at gunpoint|under threat of instant hurt|pushed.*corner.*knife|pressed a razor blade|ambushed.*atm customer.*dagger)\b", lower))
-        force_exerted = bool(re.search(r"\b(slammed|shoved|pushed|strangled|pinned down|dragged|inflicted blow|threatened with immediate death|threatened immediate violence|forcibly took|snatched.*by force|grabbed.*by her hair|forcefully stripped.*of)\b", lower))
+        victim_attempted_theft = bool(re.search(r"\b(deceased|victim|intruder|burglar|trespasser)\b[^.!?]*\b(attempting\s+theft|stealing|theft)\b", lower))
+        stole_property = bool(re.search(r"\b(stole\w*|theft|thief|took away|rob\w*|robbed|robbery|looted|snatched|decamped\s+with|decamped\s+with\s+(?:₹?\s*\d+\s*(?:lakh|crore)|cash|money|loot|property)|took (?:a |the |away|it away)?\s*(?:[a-z]+\s+)?(?:wrist watch|watch|mobile|phone|bag|handbag|backpack|cash|wallet|necklace|jewelry|valuables|ornaments|gold ornaments|laptop|motorcycle|bike)|shoplift\w*|lifted|pilfer\w*|pickpocket\w*|slid (?:his|her) hand|slipped away with|discreetly removed|concealed.*(?:handbag|backpack|jacket|pocket)|walked out without paying|exited.*without.*pay\w*|slipped.*into.*pocket|removed.*without.*consent|without\s+(?:the\s+)?(?:(?:owner|commuter|victim|anyone)'?s?\s+)?(?:knowledge|consent|permission)|drove away with.*motorcycle|stole.*motorcycle|broke the handlebar lock|forcefully stripped.*of|stripped.*of.*cash|discreetly reached|quietly detached|untied two cows|surreptitiously\s+(?:picked\s+up|removed|took)|merely snatched|snatched\s+(?:the\s+|her\s+|his\s+|a\s+)?(?:gold\s+)?(?:chain|necklace|purse|wallet|phone|bag|mobile)|surrendered\s+(?:the\s+|his\s+|her\s+|their\s+)?(?:belongings|property|wallet|phone|mobile|cash|money|valuables|bag)|handed\s+over\s+(?:a\s+|the\s+|his\s+|her\s+|their\s+)?(?:belongings|property|wallet|phone|mobile|cash|money|valuables|bag)|escaped\s+with\s+(?:the\s+)?(?:property|belongings|wallet|phone|mobile|cash|money|valuables|loot)|fled\s+with\s+(?:the\s+)?(?:property|belongings|wallet|phone|mobile|cash|money|valuables|loot)|parted\s+with\s+(?:the\s+|his\s+|her\s+|their\s+)?(?:belongings|property|wallet|phone|mobile|cash|money|valuables)|put\s+.*?\s+inside\s+his\s+jacket|picked\s+up\s+a\s+smartphone)\b", lower)) and not victim_attempted_theft
+        extortion_or_intimidation = bool(re.search(r"\b(threatened\s+(?:her|him|them|victim|complainant)?\s*with\s+(?:a\s+)?(?:knife|dagger|weapon|gun|pistol|firearm|iron rod)|demanded (?:wallet|money|cash|phone|gold|all cash|.*earnings|earnings)|held.*(?:knife|gun|dagger|revolver|pistol|iron rod|sickle|cleaver)|threats? of (?:immediate |instant )?death|held at gunpoint|held at knifepoint|pointed a (?:firearm|revolver|pistol|dagger|knife)|extorted|at gunpoint|under threat of instant hurt|pushed.*corner.*knife|pressed a razor blade|ambushed.*atm customer.*dagger|threaten\w*\s+.*?(?:unless|demanding).*?(?:hand\w*\s+over|surrender\w*|part\w*\s+with|deliver\w*|give\s+up)|under\s+(?:the\s+)?(?:threat|fear)\s+of\s+(?:immediate|instant)?\s*(?:physical\s+)?(?:harm|hurt|violence|injury|death)|fearing\s+(?:the\s+)?(?:threat|violence|harm).*?(?:surrendered|handed\s+over|parted\s+with|delivered)|threatened\s+(?:to\s+cause\s+)?(?:immediate|instant)?\s*(?:physical\s+)?(?:harm|hurt|injury|violence)\s+unless)\b", lower))
+        force_exerted = bool(re.search(r"\b(slammed|shoved|pushed|strangled|pinned down|dragged|inflicted blow|threatened with immediate death|threatened immediate violence|threatened\s+(?:to\s+cause\s+)?(?:immediate|instant)?\s*(?:physical\s+)?(?:harm|hurt|violence|injury)|forcibly took|snatched.*by force|grabbed.*by her hair|forcefully stripped.*of|overpower\w*\s+.*?(?:guards?|security|watchman))\b", lower))
 
-        if extortion_or_intimidation or (stole_property and (weapon_used or force_exerted)) or bool(re.search(r"\b(forcibly took|brandished.*forcibly took|forcefully stripped.*of)\b", lower)):
+        extortion_delivery_robbery = bool(re.search(r"\b(threaten\w*.*?(?:immediate|instant)?\s*(?:physical\s+)?(?:harm|hurt|violence|injury|death)\s+unless\b|stopped\s+(?:the\s+)?(?:complainant|victim|commuter).*?threaten\w*.*?harm.*?unless|fearing\s+(?:the\s+)?threat.*?surrendered|surrendered.*?fearing\s+(?:the\s+)?threat)\b", lower)) and (stole_property or bool(re.search(r"\b(phone|mobile|wallet|cash|money|property|belongings|valuables)\b", lower)))
+
+        # Criminal Trespass Scoping (Entering fenced property/land without permission by accused)
+        victim_trespassed = bool(re.search(r"\b(deceased|victim|complainant)\b[^.!?]*\b(trespass\w*|entered)\b", lower))
+        is_trespass = bool(re.search(r"\b(entered\s+(?:the\s+)?(?:complainant|victim|owner|private)[\"']?s?\s+(?:fenced\s+|private\s+)?(?:property|land|house|premises|compound|boundary|field)\s+without\s+(?:permission|authorization)|unlawfully\s+entered|remained\s+there\s+despite\s+being\s+instructed\s+to\s+leave|refused\s+to\s+vacate|jumped\s+(?:the\s+)?(?:perimeter\s+|boundary\s+)?(?:wall|fence)|criminal\s+trespass|trespassed|entered\s+(?:the\s+)?(?:fenced\s+)?property\s+without\s+(?:permission|authorization))\b", lower)) and not victim_trespassed and not death_caused
+        if is_trespass:
+            is_criminal_trespass = True
+            tokens.append("unlawful_entry_into_or_upon_property")
+
+        # House-breaking & Theft in Dwelling
+        is_dwelling = bool(re.search(r"\b(residential house|dwelling house|locked house|inside the (?:house|building|flat|apartment)|human dwelling)\b", lower))
+        is_housebreaking_match = bool(re.search(r"\b(broke\s+(?:the\s+)?(?:rear\s+|front\s+)?window|house-breaking|lurking\s+house-trespass|entered\s+through\s+(?:the\s+)?window|broke\s+open\s+the\s+door|house\s+trespass\s+by\s+night)\b", lower))
+        if is_housebreaking_match:
+            is_housebreaking = True
+            tokens.append("house_breaking_or_lurking_house_trespass_by_night")
+        if is_dwelling and (stole_property or bool(re.search(r"\b(laptop|gold|ornaments|belongings|valuables)\b", lower))):
+            is_theft_in_dwelling = True
+            tokens.append("building_tent_or_vessel_used_as_human_dwelling")
+
+        is_pure_extortion = bool(re.search(r"\b(protection money|hafta|threaten\w*\s+to\s+burn\s+down|extort\w*\s+money\s+by\s+putting\s+him\s+in\s+fear)\b", lower))
+        if not is_pure_extortion and (extortion_or_intimidation or extortion_delivery_robbery or (stole_property and (weapon_used or force_exerted or bool(re.search(r"\b(robbed|robbery|looted)\b", lower)))) or bool(re.search(r"\b(forcibly took|brandished.*forcibly took|forcefully stripped.*of|robbed\s+(?:him|her|them|victim))\b", lower))) and not victim_attempted_theft:
             is_robbery = True
             force_or_violence_used = True
             tokens.append("robbery_committed")
-        elif stole_property and not force_exerted and not weapon_used:
+            if injury_severity in ("Simple", "Grievous") or bool(re.search(r"\b(robbery with hurt|struck.*causing.*injur|stabbed.*robbed|hurt.*robbery|knife causing bleeding|slashed.*knife)\b", lower)):
+                is_robbery_with_hurt = True
+                tokens.append("voluntarily_causing_hurt")
+        elif (stole_property or is_theft_in_dwelling) and not force_exerted and not weapon_used and not is_trespass:
             is_theft = True
             tokens.append("dishonest_theft_taking")
 
@@ -288,15 +470,22 @@ class ScopedFactExtractor:
         if breach_trust:
             is_breach_of_trust = True
             tokens.append("criminal_breach_of_trust")
+            tokens.append("entrustment_of_property")
+            tokens.append("dishonest_misappropriation")
+
+            is_clerk_servant = bool(re.search(r"\b(employee|clerk|servant|cashier|accountant|staff|worker)\b", lower))
+            if is_clerk_servant:
+                is_breach_of_trust_clerk_servant = True
+                tokens.append("clerk_or_servant_or_employee")
 
         # Cheating & Forgery
-        cheating_terms = bool(re.search(r"\b(deceived|induced to deliver|dishonestly induc\w*|promised (?:job|government post|high returns|lucrative|mbbs)|ponzi|bogus scheme|fake investment|swindled|duped|cryptocurrency|chit fund|fake medical admission|bogus algorithm|fake layout approvals|pledging bogus|multi-level marketing|posed as (?:a|an)|non-existent|franchise security deposits|booking fees|disappeared|absconded|fled without paying|fraudulently collected|collected.*from.*investors|collected.*from.*parents|collected.*from.*members|collected.*from.*youths|fake overseas recruitment|work permits|fraudulent intent|visa stamping|bogus visa|advance deposits|diverted.*money)\b", lower))
+        cheating_terms = bool(re.search(r"\b((?:fraudulently|dishonestly)\s+induc\w*|deceived|induced to deliver|dishonestly induc\w*|promised\s+(?:job|employment|government post|high returns|lucrative|mbbs)|promis\w*\s+(?:job|employment|government|vacanc\w*)|ponzi|bogus scheme|fake investment|swindled|duped|cryptocurrency|chit fund|fake medical admission|bogus algorithm|fake layout approvals|pledging bogus|multi-level marketing|posed as (?:a|an)|non-existent|franchise security deposits|booking fees|disappeared|absconded|fled without paying|fraudulently collected|collected.*from.*investors|collected.*from.*parents|collected.*from.*members|collected.*from.*youths|fake overseas recruitment|work permits|fraudulent intent|visa stamping|bogus visa|advance deposits|diverted.*money|loan application|support a loan|obtained a loan|disbursal)\b", lower))
         if cheating_terms and not breach_trust:
             is_fraud_or_cheating = True
             fraudulent_inducement_at_inception = True
             tokens.append("fraudulent_inducement_cheating")
 
-        forgery_terms = bool(re.search(r"\b(forged|fake document|counterfeit|forgery|manufactured deed|tampered title deed|false seal|fabricated a false (?:death certificate|will|title deed)|fabricated a forged)\b", lower))
+        forgery_terms = bool(re.search(r"\b(forged|forgery|fake document|false (?:property |title |sale |official )?document|counterfeit|manufactured (?:deed|document)|tampered (?:title deed|document)|false seal|fabricated\s+(?:a\s+)?(?:false\s+|forged\s+)?(?:death certificate|will|title deed|property document|power of attorney|document)|imitating\s+(?:the\s+)?signature|forged\s+signature|fake\s+signature|discrepancies\s+in\s+(?:the\s+)?signature|fabricated\s+a\s+forged)\b", lower))
         if forgery_terms:
             is_forgery = True
             tokens.append("forged_document_fabricated")
@@ -321,13 +510,24 @@ class ScopedFactExtractor:
                 tokens.append("matrimonial_cruelty_498a")
 
         # --- 7. Sexual Offences & Criminal Intimidation ---
-        if re.search(r"\b(rape|raped|sexual assault|forced (?:herself|himself) upon|non-consensual (?:sexual )?intercourse|sexual intercourse against (?:her|his) will|violated modesty|penetrative sexual assault)\b", lower):
+        if re.search(r"\b(rape|raped|penetrative sexual assault|sexually assault\w*|sexual assault|pocso|child sexual abuse|non-consensual (?:sexual )?intercourse|sexual intercourse against (?:her|his) will|forced (?:herself|himself) upon)\b", lower):
             is_sexual_offence = True
             tokens.append("sexual_offence_rape")
+            if bool(re.search(r"\b(child|minor|student|\d+-year-old (?:girl|boy|female|male|child|student)|pocso)\b", lower)):
+                is_pocso_child_abuse = True
+                tokens.append("victim_is_child_under_18")
+                tokens.append("sexual_assault_or_penetration")
+                tokens.append("in_position_of_trust_or_teacher")
 
-        intimidation_triggers = bool(re.search(r"\b(threaten\w*|threats?)\b[^.!?]*\b(shoot|kill|burn|harm|kidnap|injur\w*|dire consequences|slit|destroy|acid)\b", lower)) or bool(re.search(r"\b(criminal intimidation|showed.*bottle of acid.*threatened|death threats?)\b", lower))
+        sexual_harassment_triggers = bool(re.search(r"\b(sexual harassment|unwelcome\s+(?:sexual\s+)?(?:remarks|advances|demands|overtures|conduct)|sexually\s+coloured\s+remarks|demands\s+for\s+sexual\s+favou?rs|unwelcome\s+sexual\s+remarks\s+and\s+demands|objected\s+to\s+sexual\s+remarks)\b", lower))
+        if sexual_harassment_triggers and not is_sexual_offence:
+            is_sexual_harassment = True
+            tokens.append("unwelcome_sexual_remarks_or_demands")
+            tokens.append("sexual_harassment_non_penetrative")
+
+        intimidation_triggers = bool(re.search(r"\b(threaten\w*|threats?)\b[^.!?]*\b(shoot|kill|burn|harm|kidnap|injur\w*|dire consequences|slit|destroy|acid|intimidat\w*)\b", lower)) or bool(re.search(r"\b(criminal intimidation|showed.*bottle of acid.*threatened|death threats?|intent\w*\s+of\s+intimidat\w*|intimidat\w*\s+(?:the\s+)?(?:owner|victim|complainant|person|homeowner)|with\s+(?:the\s+)?intent\s+to\s+intimidate|verbal\s+threats?)\b", lower))
         negated_threat = bool(re.search(r"\b(without\s+(?:any\s+)?threats?|no\s+threats?)\b", lower))
-        if (weapon_used and injury_severity == "None" and not is_robbery and not accused_unarmed and not negated_threat) or (intimidation_triggers and not death_caused and not is_robbery and not negated_threat):
+        if ((weapon_used and injury_severity == "None" and not is_robbery and not accused_unarmed and not negated_threat) or (intimidation_triggers and not death_caused and not is_robbery and not negated_threat)) and "attempt_to_murder" not in tokens:
             is_intimidation = True
             tokens.append("criminal_intimidation")
 
@@ -346,8 +546,9 @@ class ScopedFactExtractor:
         if bool(re.search(r"\b(dacoits?|dacoity|bandits)\b", lower)):
             accused_count = max(5, accused_count)
 
-        if (accused_count >= 5 or bool(re.search(r"\b(dacoits?|dacoity|bandits)\b", lower))) and (is_robbery or bool(re.search(r"\b(looted|conjointly|intercepted a cash transit|stormed a bank|raided|invaded)\b", lower))):
+        if (accused_count >= 5 or bool(re.search(r"\b(dacoits?|dacoity|bandits)\b", lower))) and (is_robbery or bool(re.search(r"\b(looted|conjointly|intercepted a cash transit|stormed.*bank|raided|invaded|decamped with)\b", lower))):
             is_dacoity = True
+            is_robbery_with_hurt = False
             tokens.append("dacoity_five_plus")
 
         if accused_count >= 2:
@@ -366,7 +567,133 @@ class ScopedFactExtractor:
         if (pure_civil or is_natural_death) and not weapon_used and not death_caused and injury_severity == "None":
             is_commercial_civil_dispute = True
             tokens.append("civil_commercial_dispute")
-            tokens.append("civil_commercial_dispute")
+
+        # --- 10. Defamation (Section 500 IPC / Section 356 BNS) ---
+        defamation_match = bool(re.search(r"\b(defamat\w*|reputat\w*|false and damaging|damaging to (?:their|his|her) reputation|harming the reputation|reputational harm|social media post.*false|false statements.*reputation)\b", lower))
+        if defamation_match and not weapon_used and not death_caused and not is_robbery and not stole_property:
+            is_defamation = True
+            tokens.append("making_or_publishing_defamatory_imputation")
+            tokens.append("intention_to_harm_reputation_or_knowledge_harm_likely")
+
+        # --- 11. Bribery & Corruption (Section 7 PC Act) ---
+        corruption_match = bool(re.search(r"\b(vigilance|marked notes|phenolphthalein|illegal gratification|bribe|bribery|public servant.*demand|clerk.*demanded.*(?:money|gratification|bribe)|trap.*laid|mutation application)\b", lower))
+        if corruption_match and not weapon_used and not death_caused:
+            is_corruption_or_bribery = True
+            tokens.append("public_servant")
+            tokens.append("demand_and_acceptance_of_illegal_gratification")
+            tokens.append("corrupt_motive_or_reward")
+
+        # --- 12. NDPS Act (Section 21 NDPS Act, 1985) ---
+        ndps_match = bool(re.search(r"\b(heroin|diacetylmorphine|cocaine|ganja|charas|narcotic|contraband.*(?:false compartment|checkpoint)|ndps|possession of narcotic)\b", lower))
+        if ndps_match and not weapon_used and not death_caused:
+            is_ndps_narcotics = True
+            is_robbery = False
+            is_theft = False
+            tokens.append("possession_of_narcotics")
+            tokens.append("commercial_quantity_or_contraband")
+            tokens.append("diacetylmorphine_or_heroin")
+
+        # --- 13. Cheque Dishonour (Section 138 NI Act, 1881) ---
+        cheque_match = bool(re.search(r"\b(cheque.*(?:dishonour|insufficient funds|returned unpaid)|dishonoured due to.*insufficient funds|statutory notice.*15 days|section 138|ni act)\b", lower))
+        if cheque_match and not weapon_used and not death_caused:
+            is_cheque_dishonour = True
+            tokens.append("dishonour_of_cheque")
+            tokens.append("insufficient_funds")
+            tokens.append("statutory_demand_notice_served")
+            tokens.append("failure_to_pay_within_15_days")
+
+        # --- 14. Extortion (Section 384 IPC / Section 308(2) BNS) ---
+        extortion_match = bool(re.search(r"\b(extort\w*|demanded.*(?:ransom|protection money|hafta)|putting.*in fear of injury|compelling.*deliver.*(?:property|money|cash)|threaten\w*\s+to\s+implicate.*?unless\s+paid|threaten\w*.*?unless\s+paid|caught red-handed accepting.*lakh)\b", lower))
+        if extortion_match and not is_robbery and not death_caused:
+            is_extortion = True
+            tokens.append("intentional_putting_in_fear_of_injury")
+            tokens.append("dishonest_inducement_to_deliver_property_or_valuable_security")
+
+        # --- 15. Acid Attack (Section 326A IPC / Section 124(1) BNS) ---
+        acid_match = bool(re.search(r"\b(acid attack|threw acid|corrosive acid|facial disfigurement.*acid|vitriol)\b", lower))
+        if acid_match:
+            is_acid_attack = True
+            tokens.append("throwing_or_administering_acid")
+            tokens.append("intention_or_knowledge_of_causing_grievous_hurt_or_disfigurement")
+            tokens.append("permanent_or_partial_damage_or_deformity")
+
+        # --- 16. Kidnapping for Ransom (Section 364A IPC / Section 140(2) BNS) ---
+        kidnap_match = bool(re.search(r"\b(kidnapped.*ransom|abducted.*ransom|demanded.*(?:ransom|crore|lakh).*release|threatening to kill.*unless ransom)\b", lower))
+        if kidnap_match:
+            is_kidnapping_ransom = True
+            tokens.append("kidnapping_or_abducting_person")
+            tokens.append("keeping_person_in_detention")
+            tokens.append("threatening_to_cause_death_or_hurt")
+            tokens.append("demand_for_ransom")
+
+        # --- 17. Cyber Phishing / Personation (Section 66D IT Act / Section 318(4) BNS) ---
+        cyber_match = bool(re.search(r"\b(phishing|cheating by personation|cyber fraud|unauthorized otp|impersonating bank official|fake netbanking portal|remote access app|fake customer care|sharing (?:their )?otps?|tricked into sharing.*otp|online financial fraud|cybercrime|digital forensics.*ip address)\b", lower))
+        if cyber_match and not weapon_used and not death_caused:
+            is_cyber_phishing = True
+            tokens.append("cheating_by_personation")
+            tokens.append("use_of_computer_resource_or_communication_device")
+            tokens.append("fraudulent_transfer_of_funds")
+
+        # --- 18. Hate Speech / Promoting Enmity (Section 153A IPC / Section 196 BNS) ---
+        hate_speech_match = bool(re.search(r"\b(hate speech|enemies of the nation|boycott their businesses|communal tension|promoting enmity|enmity between different (?:groups|communities|religions)|section 153a|section 196 bns)\b", lower))
+        if hate_speech_match and not weapon_used and not death_caused:
+            is_hate_speech_153a = True
+            tokens.append("spoken_or_written_words_or_signs_or_visible_representations")
+            tokens.append("promoting_or_attempting_to_promote_disharmony_or_feelings_of_enmity_hatred_or_ill_will")
+            tokens.append("acts_prejudicial_to_maintenance_of_public_tranquillity")
+
+        # --- 19. Arms Act (Section 25 Arms Act, 1959) ---
+        arms_match = bool(re.search(r"\b(arms act|illegal possession of firearms|country-made pistol.*cartridges|no firearm licence|recovered a country-made pistol|live cartridges.*residence|routine search.*recovered.*(?:pistol|cartridges|firearm)|section 25 arms act)\b", lower))
+        if arms_match and not death_caused and not is_robbery:
+            is_arms_act = True
+            tokens.append("possession_or_acquisition_of_firearm_or_ammunition")
+            tokens.append("absence_of_valid_firearms_licence")
+            tokens.append("recovery_of_firearms_or_live_cartridges")
+
+        # --- 20. CBT by Public Servant, Banker, Merchant, Agent (Section 409 IPC / Section 316(5) BNS) ---
+        cbt_public_match = bool(re.search(r"\b(section 409\b|section 316\(5\)|breach of trust by public servant|public servant.*entrusted|banker.*misappropriat|treasury officer.*misappropriat|revenue collector.*defalcation|entrusted in his capacity of a public servant|entrusted with property as a banker|commercial agent.*misappropriated funds)\b", lower))
+        if cbt_public_match and not is_robbery and not death_caused:
+            is_cbt_public_servant_banker = True
+            tokens.append("entrustment_in_capacity_of_public_servant_banker")
+            tokens.append("dishonest_misappropriation_or_conversion")
+
+        # --- 21. Arson / Mischief by Fire to House/Building (Section 436 IPC / Section 326(f) BNS) ---
+        is_threat_of_arson = bool(re.search(r"\b(threaten\w*\s+with\s+arson|threat\s+of\s+arson)\b", lower))
+        arson_match = bool(re.search(r"\b(section 436\b|section 326\(f\)|arson|mischief by fire|set fire to.*(?:dwelling|house|building|shop|godown|warehouse|place of worship)|torched the house|combustible substance.*set fire|gutted by fire intentionally)\b", lower))
+        if arson_match and not death_caused and not is_threat_of_arson and not is_extortion:
+            is_arson_fire = True
+            tokens.append("mischief_by_fire_or_explosive_substance")
+            tokens.append("intent_to_cause_destruction_of_house_or_place_of_worship_or_custody_of_property")
+
+        # --- 22. Kidnapping from Lawful Guardianship (Section 363 IPC / Section 137(2) BNS) ---
+        kidnap_minor_match = bool(re.search(r"\b(section 363\b|section 137\(2\)|kidnapped.*minor|enticed.*minor|out of the keeping of.*(?:lawful guardian|parents|father|mother)|kidnapped from school.*without.*ransom|without the consent of.*guardian|taken away.*minor girl|enticed away a (?:14|15|16|17|child|minor))\b", lower))
+        if kidnap_minor_match and not is_kidnapping_ransom and not death_caused:
+            is_kidnapping_lawful_guardian = True
+            tokens.append("taking_or_enticing_minor_or_unsound_mind")
+            tokens.append("out_of_keeping_of_lawful_guardian")
+            tokens.append("without_consent_of_guardian")
+
+        # --- 23. Stalking (Section 354D IPC / Section 78 BNS) ---
+        stalking_match = bool(re.search(r"\b(section 354d\b|section 78 bns|stalking|stalked|persistently followed|monitored.*(?:internet|email|social media|electronic communications?)|followed.*despite.*disinterest|tracked.*movements.*against her will)\b", lower))
+        if stalking_match and not death_caused and not is_sexual_offence:
+            is_stalking = True
+            tokens.append("follows_a_woman_and_contacts_or_attempts_to_contact_to_foster_personal_interaction_despite_clear_disinterest")
+            tokens.append("monitors_the_use_by_a_woman_of_the_internet_email_or_electronic_communication")
+
+        # --- 24. Causing Disappearance of Evidence / Screening Offender (Section 201 IPC / Section 238 BNS) ---
+        evidence_destr_match = bool(re.search(r"\b(section 201\b|section 238 bns|disappearance of evidence|destruction of evidence|screen(?:ed|ing)? the offender|threw the weapon into (?:canal|river)|washed away bloodstains|burned the clothes to destroy evidence|wiped fingerprints|buried the body to conceal|concealed evidence of offence)\b", lower))
+        if evidence_destr_match and not death_caused:
+            is_destruction_of_evidence = True
+            tokens.append("causing_evidence_of_offence_to_disappear")
+            tokens.append("intention_of_screening_offender_from_legal_punishment")
+            tokens.append("giving_false_information_respecting_offence")
+
+        # --- 25. Counterfeiting Currency Notes FICN (Section 489A IPC / Section 178 BNS) ---
+        ficn_match = bool(re.search(r"\b(section 489a\b|section 178 bns|counterfeiting currency|counterfeit (?:currency|banknotes?|notes)|fake indian currency notes?|ficn|printing fake currency|high quality counterfeit notes|counterfeiting process|counterfeit notes of.*denomination)\b", lower))
+        if ficn_match:
+            is_counterfeit_currency = True
+            tokens.append("counterfeiting_or_performing_any_part_of_process_of_counterfeiting_currency_notes_or_banknotes")
+            tokens.append("knowing_or_having_reason_to_believe_to_be_counterfeit")
 
         return AtomicFacts(
             is_out_of_domain=False,
@@ -388,11 +715,36 @@ class ScopedFactExtractor:
             fraudulent_inducement_at_inception=fraudulent_inducement_at_inception,
             is_forgery=is_forgery,
             is_breach_of_trust=is_breach_of_trust,
+            is_breach_of_trust_clerk_servant=is_breach_of_trust_clerk_servant,
+            is_criminal_negligence=is_criminal_negligence,
             is_matrimonial=is_matrimonial,
             is_dowry_death=is_dowry_death,
             marriage_years=marriage_years,
             is_sexual_offence=is_sexual_offence,
+            is_sexual_harassment=is_sexual_harassment,
             is_intimidation=is_intimidation,
+            is_criminal_trespass=is_criminal_trespass,
+            is_defamation=is_defamation,
+            is_housebreaking=is_housebreaking,
+            is_theft_in_dwelling=is_theft_in_dwelling,
+            is_robbery_with_hurt=is_robbery_with_hurt,
+            is_corruption_or_bribery=is_corruption_or_bribery,
+            is_suicide_abetment=is_suicide_abetment,
+            is_ndps_narcotics=is_ndps_narcotics,
+            is_cheque_dishonour=is_cheque_dishonour,
+            is_pocso_child_abuse=is_pocso_child_abuse,
+            is_extortion=is_extortion,
+            is_acid_attack=is_acid_attack,
+            is_kidnapping_ransom=is_kidnapping_ransom,
+            is_cyber_phishing=is_cyber_phishing,
+            is_hate_speech_153a=is_hate_speech_153a,
+            is_arms_act=is_arms_act,
+            is_cbt_public_servant_banker=is_cbt_public_servant_banker,
+            is_arson_fire=is_arson_fire,
+            is_kidnapping_lawful_guardian=is_kidnapping_lawful_guardian,
+            is_stalking=is_stalking,
+            is_destruction_of_evidence=is_destruction_of_evidence,
+            is_counterfeit_currency=is_counterfeit_currency,
             accused_count=accused_count,
             has_common_intention=has_common_intention,
             is_criminal_conspiracy=is_criminal_conspiracy,
