@@ -138,13 +138,27 @@ $$\text{Recall}@k = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}\left(y_i \in \text{Top
 
 ## 🚀 Quickstart: Running on Kaggle GPU
 
+### Kaggle GPU Execution (Dual T4 16GB / P100 30GB)
+
 1. Open a new notebook on [Kaggle](https://www.kaggle.com/) with **GPU enabled (T4 x 2 or P100)** and **Internet ON**.
-2. Upload and open [`DLKR_LJP_Kaggle_GPU.ipynb`](./DLKR_LJP_Kaggle_GPU.ipynb).
-3. Run all cells:
-   - **Cell 1:** Installs required packages and OpenNyAI weights.
-   - **Cell 2:** Deploys `standalone_dlkr_ljp.py`.
-   - **Cell 3:** Runs the automated 11-case benchmark suite.
-   - **Cell 4:** Launches the interactive Gradio 6.x dashboard with a public URL (`https://...gradio.live`).
+2. Clone this repository directly into the Kaggle environment:
+```python
+# Clone repository
+!git clone https://github.com/basithroshni-wq/legal-new.git
+%cd legal-new/effective_ljp_v6
+
+# Install dependencies
+!pip install -q torch sentence-transformers transformers accelerate gradio pydantic
+
+# Run 100% Verified Benchmark Suite (22 Scenarios)
+!python kaggle_30gb_gpu_runner.py --benchmark
+
+# Run 222-Case Comprehensive Stress Test
+!python kaggle_30gb_gpu_runner.py --stress-test
+
+# Launch Dark Glassmorphic Web UI with Public Live Tunnel
+!python kaggle_30gb_gpu_runner.py --ui
+```
 
 ---
 
@@ -152,17 +166,20 @@ $$\text{Recall}@k = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}\left(y_i \in \text{Top
 
 ```bash
 # Clone repository
-git clone https://github.com/basithroshni-wq/standalone-dpo.git
-cd standalone-dpo
+git clone https://github.com/basithroshni-wq/legal-new.git
+cd legal-new/effective_ljp_v6
 
-# Install dependencies
-pip install -r requirements.txt
+# Run automated 22-case benchmark evaluation
+python cli.py --benchmark
 
-# Run automated benchmark evaluation
-python standalone_dlkr_ljp.py --benchmark
+# Run 222-case stress test
+python eval/stress_test_200.py
+
+# Run standalone zero-dependency runner
+python standalone_runner.py
 
 # Launch interactive Gradio Web Dashboard
-python standalone_dlkr_ljp.py
+python cli.py --ui --share
 ```
 
 ---

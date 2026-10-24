@@ -9,3 +9,4 @@ chroma_legal_kb/
 *.zip
 *.pdf
 .system_generated/
+graphify-out/

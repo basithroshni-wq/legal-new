@@ -1,0 +1,442 @@
+[
+  {
+    "id": "STAT_302_IPC",
+    "ipc_section": "Section 302",
+    "bns_section": "Section 103(1)",
+    "statute_title": "Punishment for Murder",
+    "charge_category": "Murder & Culpable Homicide",
+    "statutory_ceiling_tier": "Tier 4 (Life Imprisonment / Capital)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 20,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "death_caused",
+      "intention_to_cause_death",
+      "intention_to_cause_bodily_injury_sufficient_in_ordinary_course_of_nature",
+      "premeditation_or_brutal_ferocity"
+    ],
+    "negative_exceptions": [
+      "sudden_fight_heat_of_passion",
+      "grave_and_sudden_provocation",
+      "exercise_of_private_defence"
+    ],
+    "legal_definition": "Whoever commits murder shall be punished with death, or imprisonment for life, and shall also be liable to fine under Section 302 IPC / Section 103(1) BNS."
+  },
+  {
+    "id": "STAT_304_P1_IPC",
+    "ipc_section": "Section 304 Part I",
+    "bns_section": "Section 105",
+    "statute_title": "Culpable Homicide Not Amounting to Murder (With Intention)",
+    "charge_category": "Murder & Culpable Homicide",
+    "statutory_ceiling_tier": "Tier 4 (Life Imprisonment / Capital)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 5,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "death_caused",
+      "intention_to_cause_death_or_injury_likely_to_cause_death",
+      "act_done_under_statutory_exception_such_as_excess_private_defence_or_sudden_provocation"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Culpable homicide not amounting to murder punished with imprisonment for life, or imprisonment of either description for a term which may extend to ten years, and fine, if the act is done with intention of causing death."
+  },
+  {
+    "id": "STAT_304_P2_IPC",
+    "ipc_section": "Section 304 Part II",
+    "bns_section": "Section 105",
+    "statute_title": "Culpable Homicide Not Amounting to Murder (Knowledge Without Intention / Sudden Fight)",
+    "charge_category": "Culpable Homicide (Sudden Fight)",
+    "statutory_ceiling_tier": "Tier 3 (7 to 10 Years)",
+    "statutory_max_years": 10,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "death_caused",
+      "knowledge_that_act_is_likely_to_cause_death",
+      "absence_of_premeditation",
+      "sudden_fight_in_heat_of_passion_upon_sudden_quarrel"
+    ],
+    "negative_exceptions": [
+      "undue_advantage_taken",
+      "cruel_or_unusual_manner"
+    ],
+    "legal_definition": "Imprisonment of either description for a term which may extend to ten years, or with fine, or with both, if the act is done with knowledge that it is likely to cause death, but without any intention to cause death (Exception 4 Section 300 IPC)."
+  },
+  {
+    "id": "STAT_307_IPC",
+    "ipc_section": "Section 307",
+    "bns_section": "Section 109",
+    "statute_title": "Attempt to Murder",
+    "charge_category": "Attempt to Murder",
+    "statutory_ceiling_tier": "Tier 4 (Life Imprisonment / Capital)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "overt_act_towards_commission_of_murder",
+      "intention_or_knowledge_to_commit_murder",
+      "act_capable_of_causing_death_if_not_prevented"
+    ],
+    "negative_exceptions": [
+      "death_actually_caused"
+    ],
+    "legal_definition": "Whoever does any act with such intention or knowledge, and under such circumstances, that, if he by that act caused death, he would be guilty of murder. If hurt is caused to any person by such act, the offender is liable to imprisonment for life, or up to 10 years."
+  },
+  {
+    "id": "STAT_326_IPC",
+    "ipc_section": "Section 326",
+    "bns_section": "Section 118(2)",
+    "statute_title": "Voluntarily Causing Grievous Hurt by Dangerous Weapons or Means",
+    "charge_category": "Assault & Grievous Hurt",
+    "statutory_ceiling_tier": "Tier 4 (Life Imprisonment / Capital)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "grievous_hurt_caused",
+      "dangerous_weapon_or_instrument_used_for_shooting_stabbing_cutting",
+      "vital_organ_perforation_or_permanent_privation_or_fracture"
+    ],
+    "negative_exceptions": [
+      "death_caused"
+    ],
+    "legal_definition": "Whoever voluntarily causes grievous hurt by means of any instrument for shooting, stabbing or cutting, or corrosive substance, shall be punished with imprisonment for life, or with imprisonment of either description for a term which may extend to ten years."
+  },
+  {
+    "id": "STAT_324_IPC",
+    "ipc_section": "Section 324",
+    "bns_section": "Section 118(1)",
+    "statute_title": "Voluntarily Causing Hurt by Dangerous Weapons or Means",
+    "charge_category": "Assault & Grievous Hurt",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 3,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "simple_hurt_caused",
+      "instrument_for_shooting_stabbing_or_cutting_used",
+      "absence_of_permanent_privation_or_fracture"
+    ],
+    "negative_exceptions": [
+      "grievous_hurt",
+      "death_caused"
+    ],
+    "legal_definition": "Whoever voluntarily causes hurt by means of any instrument for shooting, stabbing or cutting shall be punished with imprisonment for a term which may extend to three years, or with fine, or with both."
+  },
+  {
+    "id": "STAT_323_IPC",
+    "ipc_section": "Section 323",
+    "bns_section": "Section 115(2)",
+    "statute_title": "Punishment for Voluntarily Causing Hurt",
+    "charge_category": "Assault & Grievous Hurt",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 1,
+    "statutory_min_years": 0,
+    "is_cognizable": false,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "bodily_pain_disease_or_infirmity_caused",
+      "intention_or_knowledge_to_cause_hurt",
+      "no_weapon_used_or_blunt_fist_slap"
+    ],
+    "negative_exceptions": [
+      "dangerous_weapon",
+      "grievous_hurt"
+    ],
+    "legal_definition": "Whoever voluntarily causes hurt shall be punished with imprisonment of either description for a term which may extend to one year, or with fine which may extend to one thousand rupees, or with both."
+  },
+  {
+    "id": "STAT_379_IPC",
+    "ipc_section": "Section 379",
+    "bns_section": "Section 303(2)",
+    "statute_title": "Punishment for Theft",
+    "charge_category": "Theft & Property Offences",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 3,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "dishonest_intention_to_take_movable_property",
+      "taking_out_of_possession_without_consent",
+      "moving_the_property_in_order_to_such_taking",
+      "absence_of_force_or_intimidation_at_the_time_of_taking"
+    ],
+    "negative_exceptions": [
+      "force_used",
+      "violence_or_extortion",
+      "commercial_contract_dispute"
+    ],
+    "legal_definition": "Whoever commits theft shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both under Section 379 IPC / Section 303(2) BNS."
+  },
+  {
+    "id": "STAT_392_IPC",
+    "ipc_section": "Section 392",
+    "bns_section": "Section 309(4)",
+    "statute_title": "Punishment for Robbery",
+    "charge_category": "Theft & Property Offences (Robbery)",
+    "statutory_ceiling_tier": "Tier 3 (7 to 10 Years)",
+    "statutory_max_years": 10,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "theft_or_extortion_committed",
+      "voluntarily_causing_or_attempting_to_cause_death_hurt_or_wrongful_restraint_or_fear_of_instant_hurt",
+      "force_or_intimidation_used_for_carrying_away_property"
+    ],
+    "negative_exceptions": [
+      "five_or_more_persons_conjointly"
+    ],
+    "legal_definition": "Whoever commits robbery shall be punished with rigorous imprisonment for a term which may extend to ten years (fourteen years if committed on the highway between sunset and sunrise)."
+  },
+  {
+    "id": "STAT_395_IPC",
+    "ipc_section": "Section 395",
+    "bns_section": "Section 310(2)",
+    "statute_title": "Punishment for Dacoity",
+    "charge_category": "Theft & Property Offences (Robbery)",
+    "statutory_ceiling_tier": "Tier 4 (Life Imprisonment / Capital)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "robbery_committed_or_attempted",
+      "five_or_more_persons_conjointly_committing"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever commits dacoity shall be punished with imprisonment for life, or with rigorous imprisonment for a term which may extend to ten years, and shall also be liable to fine."
+  },
+  {
+    "id": "STAT_406_IPC",
+    "ipc_section": "Section 406",
+    "bns_section": "Section 316(2)",
+    "statute_title": "Punishment for Criminal Breach of Trust",
+    "charge_category": "Criminal Breach of Trust",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 3,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "entrustment_of_property_or_dominion_over_property",
+      "dishonest_misappropriation_or_conversion_to_own_use",
+      "violation_of_legal_direction_or_contract"
+    ],
+    "negative_exceptions": [
+      "initial_dishonest_inducement_at_inception"
+    ],
+    "legal_definition": "Whoever commits criminal breach of trust shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both."
+  },
+  {
+    "id": "STAT_420_IPC",
+    "ipc_section": "Section 420",
+    "bns_section": "Section 318(4)",
+    "statute_title": "Cheating and Dishonestly Inducing Delivery of Property",
+    "charge_category": "Cheating & Financial Fraud",
+    "statutory_ceiling_tier": "Tier 2 (3 to 7 Years)",
+    "statutory_max_years": 7,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "deception_of_any_person",
+      "fraudulent_or_dishonest_inducement_from_inception",
+      "delivery_of_property_or_making_altering_destroying_valuable_security"
+    ],
+    "negative_exceptions": [
+      "mere_subsequent_failure_of_contractual_promise"
+    ],
+    "legal_definition": "Whoever cheats and thereby dishonestly induces the person deceived to deliver any property shall be punished with imprisonment of either description for a term which may extend to seven years, and shall also be liable to fine."
+  },
+  {
+    "id": "STAT_468_IPC",
+    "ipc_section": "Section 468",
+    "bns_section": "Section 336(3)",
+    "statute_title": "Forgery for Purpose of Cheating",
+    "charge_category": "Forgery & Counterfeiting",
+    "statutory_ceiling_tier": "Tier 2 (3 to 7 Years)",
+    "statutory_max_years": 7,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "making_false_document_or_electronic_record",
+      "forgery_committed_with_intent_that_document_shall_be_used_for_cheating"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever commits forgery, intending that the document forged shall be used for the purpose of cheating, shall be punished with imprisonment of either description for a term which may extend to seven years, and fine."
+  },
+  {
+    "id": "STAT_471_IPC",
+    "ipc_section": "Section 471",
+    "bns_section": "Section 340(2)",
+    "statute_title": "Using as Genuine a Forged Document",
+    "charge_category": "Forgery & Counterfeiting",
+    "statutory_ceiling_tier": "Tier 2 (3 to 7 Years)",
+    "statutory_max_years": 7,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "fraudulently_or_dishonestly_using_as_genuine",
+      "document_known_or_believed_to_be_forged"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever fraudulently or dishonestly uses as genuine any document which he knows or has reason to believe to be a forged document, shall be punished in the same manner as if he had forged such document."
+  },
+  {
+    "id": "STAT_376_IPC",
+    "ipc_section": "Section 376",
+    "bns_section": "Section 64",
+    "statute_title": "Punishment for Rape / Sexual Offences",
+    "charge_category": "Sexual Offences & Assault",
+    "statutory_ceiling_tier": "Tier 4 (Life Imprisonment / Capital)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 10,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "non_consensual_sexual_act",
+      "against_will_or_without_consent_or_obtained_under_duress"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever commits rape shall be punished with rigorous imprisonment of either description for a term which shall not be less than ten years, but which may extend to imprisonment for life, and shall also be liable to fine."
+  },
+  {
+    "id": "STAT_498A_IPC",
+    "ipc_section": "Section 498A",
+    "bns_section": "Section 85",
+    "statute_title": "Husband or Relative of Husband of a Woman Subjecting Her to Cruelty",
+    "charge_category": "Matrimonial Cruelty & Harassment",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 3,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "woman_subjected_to_cruelty",
+      "accused_is_husband_or_relative_of_husband",
+      "willful_conduct_driving_to_suicide_or_harassment_for_unlawful_dowry_demands"
+    ],
+    "negative_exceptions": [
+      "death_within_seven_years_with_burns_or_unnatural_circumstances"
+    ],
+    "legal_definition": "Whoever, being the husband or the relative of the husband of a woman, subjects such woman to cruelty shall be punished with imprisonment for a term which may extend to three years and shall also be liable to fine."
+  },
+  {
+    "id": "STAT_304B_IPC",
+    "ipc_section": "Section 304B",
+    "bns_section": "Section 80",
+    "statute_title": "Dowry Death",
+    "charge_category": "Dowry Death & Heinous Matrimonial",
+    "statutory_ceiling_tier": "Tier 4 (Life Imprisonment / Capital)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 7,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "death_of_woman_by_burns_bodily_injury_or_unnatural_circumstances",
+      "death_within_seven_years_of_marriage",
+      "shown_that_soon_before_death_she_was_subjected_to_cruelty_or_harassment_by_husband_or_relatives_in_connection_with_dowry"
+    ],
+    "negative_exceptions": [
+      "marriage_duration_exceeding_seven_years"
+    ],
+    "legal_definition": "Where the death of a woman is caused by any burns or bodily injury or occurs otherwise than under normal circumstances within seven years of her marriage and it is shown that soon before her death she was subjected to cruelty for dowry, such husband or relative shall be punished with imprisonment for not less than seven years but which may extend to life."
+  },
+  {
+    "id": "STAT_506_IPC",
+    "ipc_section": "Section 506",
+    "bns_section": "Section 351",
+    "statute_title": "Punishment for Criminal Intimidation",
+    "charge_category": "Criminal Intimidation",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 2,
+    "statutory_min_years": 0,
+    "is_cognizable": false,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "threat_to_injure_person_reputation_or_property",
+      "intent_to_cause_alarm_or_compel_action"
+    ],
+    "negative_exceptions": [
+      "physical_battery_or_injury_actually_inflicted"
+    ],
+    "legal_definition": "Whoever commits criminal intimidation shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both; if threat be to cause death or grievous hurt, term may extend to seven years."
+  },
+  {
+    "id": "STAT_34_IPC",
+    "ipc_section": "Section 34",
+    "bns_section": "Section 3(5)",
+    "statute_title": "Acts Done by Several Persons in Furtherance of Common Intention",
+    "charge_category": "Joint Liability (Common Intention)",
+    "statutory_ceiling_tier": "Tier 2 (3 to 7 Years)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "criminal_act_done_by_several_persons",
+      "in_furtherance_of_common_intention_of_all",
+      "active_participation_in_commission_of_crime"
+    ],
+    "negative_exceptions": [
+      "sole_accused",
+      "independent_spontaneous_isolated_acts"
+    ],
+    "legal_definition": "When a criminal act is done by several persons in furtherance of the common intention of all, each of such persons is liable for that act in the same manner as if it were done by him alone."
+  },
+  {
+    "id": "STAT_120B_IPC",
+    "ipc_section": "Section 120B",
+    "bns_section": "Section 61(2)",
+    "statute_title": "Punishment of Criminal Conspiracy",
+    "charge_category": "Criminal Conspiracy",
+    "statutory_ceiling_tier": "Tier 2 (3 to 7 Years)",
+    "statutory_max_years": 99,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "agreement_between_two_or_more_persons",
+      "to_do_or_cause_to_be_done_an_illegal_act",
+      "meeting_of_minds_prior_to_commission"
+    ],
+    "negative_exceptions": [
+      "sole_accused"
+    ],
+    "legal_definition": "Whoever is a party to a criminal conspiracy to commit an offence punishable with death, imprisonment for life or rigorous imprisonment for a term of two years or upwards, shall be punished in the same manner as if he had abetted such offence."
+  },
+  {
+    "id": "STAT_CIVIL_482",
+    "ipc_section": "Quashed u/s 482 CrPC",
+    "bns_section": "Section 528 BNSS",
+    "statute_title": "Civil Dispute / Inherent Powers to Quash Proceedings",
+    "charge_category": "No Criminal Offence (Civil Dispute)",
+    "statutory_ceiling_tier": "Quashed (No Penal Term)",
+    "statutory_max_years": 0,
+    "statutory_min_years": 0,
+    "is_cognizable": false,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "dispute_purely_of_civil_commercial_nature",
+      "absence_of_mens_rea_or_criminal_intent_at_inception",
+      "breach_of_contract_or_accounting_reconciliation_or_arbitration_clause"
+    ],
+    "negative_exceptions": [
+      "violence",
+      "weapon",
+      "physical_harm",
+      "forged_document"
+    ],
+    "legal_definition": "Where the allegations in the FIR constitute a purely commercial or contractual dispute without any fraudulent intention at inception, the proceedings are liable to be quashed under Section 482 CrPC / Section 528 BNSS (Bhajan Lal principle)."
+  }
+]

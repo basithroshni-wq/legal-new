@@ -1,0 +1,72 @@
+[
+  {
+    "id": "PREC_PULICHERLA",
+    "case_title": "Pulicherla Nagaraju alias Nagaraja Reddy v. State of A.P.",
+    "citation": "(2006) 11 SCC 444",
+    "court": "Supreme Court of India",
+    "bench": "R.V. Raveendran, J.",
+    "key_statutes": ["Section 300 IPC", "Section 302 IPC", "Section 304 Part I IPC", "Section 304 Part II IPC"],
+    "ratio_decidendi": "To ascertain whether an intention to cause death existed under Section 300, the Court must examine factors including: (1) nature and weapon used; (2) whether weapon was carried or found at the spot; (3) whether blow was aimed at a vital part; (4) amount of force applied; (5) whether it was in the course of a sudden quarrel; and (6) whether accused took undue advantage. Where death is caused in a sudden quarrel with a single blow without premeditation, the conviction is properly under Section 304 Part II rather than Section 302.",
+    "applicable_categories": ["Culpable Homicide (Sudden Fight)", "Murder & Culpable Homicide"]
+  },
+  {
+    "id": "PREC_RAYAVARAPU",
+    "case_title": "State of Andhra Pradesh v. Rayavarapu Punnayya",
+    "citation": "(1976) 4 SCC 382",
+    "court": "Supreme Court of India",
+    "bench": "R.S. Sarkaria, J.",
+    "key_statutes": ["Section 299 IPC", "Section 300 IPC", "Section 304 IPC"],
+    "ratio_decidendi": "Established the definitive three-stage test to distinguish culpable homicide (Section 299) from murder (Section 300). Culpable homicide is the genus, and murder is the species. All murder is culpable homicide, but not vice-versa. Clause 3 of Section 300 requires proof of objective bodily injury intended to be inflicted, and subjective medical probability that such injury is sufficient in the ordinary course of nature to cause death.",
+    "applicable_categories": ["Murder & Culpable Homicide"]
+  },
+  {
+    "id": "PREC_GHAPOO_YADAV",
+    "case_title": "Ghapoo Yadav and Others v. State of M.P.",
+    "citation": "(2003) 3 SCC 528",
+    "court": "Supreme Court of India",
+    "bench": "Arijit Pasayat, J.",
+    "key_statutes": ["Section 300 Exception 4 IPC", "Section 304 Part I/II IPC"],
+    "ratio_decidendi": "Exception 4 to Section 300 IPC requires four cumulative ingredients: (i) sudden fight; (ii) absence of premeditation; (iii) act done in the heat of passion; and (iv) the offender not having taken undue advantage or acted in a cruel or unusual manner. Time elapsed between provocation and act determines whether passion had cooled.",
+    "applicable_categories": ["Culpable Homicide (Sudden Fight)"]
+  },
+  {
+    "id": "PREC_ARNESH_KUMAR",
+    "case_title": "Arnesh Kumar v. State of Bihar",
+    "citation": "(2014) 8 SCC 273",
+    "court": "Supreme Court of India",
+    "bench": "Chandramauli Kr. Prasad, J.",
+    "key_statutes": ["Section 41 CrPC", "Section 498A IPC", "Section 35 BNSS"],
+    "ratio_decidendi": "Arrest should not be automatic in offences punishable with imprisonment up to 7 years. Police officers must apply Section 41 CrPC checklist and record reasons before arrest. Directs judicial magistrates not to authorize detention mechanically in Tier 1 and Tier 2 penal offences.",
+    "applicable_categories": ["Matrimonial Cruelty & Harassment", "Cheating & Financial Fraud", "Theft & Property Offences"]
+  },
+  {
+    "id": "PREC_BHAJAN_LAL",
+    "case_title": "State of Haryana v. Bhajan Lal",
+    "citation": "1992 Supp (1) SCC 335",
+    "court": "Supreme Court of India",
+    "bench": "S. Ratnavel Pandian, J.",
+    "key_statutes": ["Section 482 CrPC", "Section 528 BNSS"],
+    "ratio_decidendi": "Enumerated seven illustrative categories where High Court can exercise inherent power under Section 482 CrPC to quash FIR: including where allegations taken at face value do not prima facie constitute any offence, or where the criminal proceeding is manifestly attended with mala fide and constitutes a civil breach of contract.",
+    "applicable_categories": ["No Criminal Offence (Civil Dispute)"]
+  },
+  {
+    "id": "PREC_SATENDER_ANTIL",
+    "case_title": "Satender Kumar Antil v. Central Bureau of Investigation",
+    "citation": "(2022) 10 SCC 51",
+    "court": "Supreme Court of India",
+    "bench": "S.K. Kaul, J.",
+    "key_statutes": ["Section 436 CrPC", "Section 437 CrPC", "Section 439 CrPC"],
+    "ratio_decidendi": "Classified offences into four distinct categories (A to D) for bail adjudication: Category A covers offences punishable up to 7 years (routine bail without arrest); Category B covers offences punishable with life imprisonment or death; Category C covers Special Acts (NDPS, PMLA); Category D covers economic offences. Reasserted that bail is the rule and jail is the exception.",
+    "applicable_categories": ["Theft & Property Offences", "Cheating & Financial Fraud", "Assault & Grievous Hurt"]
+  },
+  {
+    "id": "PREC_MEHBOOB_SHAH",
+    "case_title": "Mehboob Shah v. King-Emperor",
+    "citation": "(1945) 47 BOMLR 997 (Privy Council)",
+    "court": "Privy Council / Supreme Court Precedent",
+    "bench": "Sir Madhavan Nair",
+    "key_statutes": ["Section 34 IPC", "Section 3(5) BNS"],
+    "ratio_decidendi": "Distinguished 'common intention' under Section 34 from 'similar intention'. Common intention implies a pre-arranged plan and acting in concert in pursuant of that plan. Prior meeting of minds, even if formed on the spot, is an indispensable prerequisite before vicarious joint liability attaches.",
+    "applicable_categories": ["Joint Liability (Common Intention)", "Murder & Culpable Homicide"]
+  }
+]

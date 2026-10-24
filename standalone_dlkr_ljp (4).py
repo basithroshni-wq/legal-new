@@ -1,7 +1,7 @@
 """
 ========================================================================================
 DLKR-LJP: Dynamic Legal Knowledge Retrieval for Legal Judgment Prediction (Indian Law)
-SELF-CONTAINED STANDALONE PIPELINE V5.0 (OPEN PRETRAINED LEGAL WEIGHTS: INLEGALBERT + OPENNYAI + QWEN2.5) [KAGGLE/COLAB GPU-OPTIMIZED]
+SELF-CONTAINED STANDALONE PIPELINE V4.0 (OPEN PRETRAINED LEGAL WEIGHTS: INLEGALBERT + OPENNYAI + QWEN2.5)
 ========================================================================================
 5-Stage Paper Architecture + Pretrained Legal Reasoner:
 1. Dynamic Retrieval Module (DRM) - Lexical & Dense Vector Retrieval over Curated Legal KB
@@ -15,16 +15,6 @@ SELF-CONTAINED STANDALONE PIPELINE V5.0 (OPEN PRETRAINED LEGAL WEIGHTS: INLEGALB
 import os
 import sys
 import math
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
-if hasattr(sys.stderr, "reconfigure"):
-    try:
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
 import re
 import json
 import copy
@@ -32,10 +22,32 @@ import html
 import logging
 import hashlib
 import traceback
+import urllib.request
+import urllib.error
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass, field
+
+try:
+    import torch
+    import torch.nn as nn
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+    nn = None
+
+HEAD_WEIGHTS_FILENAME = "legal_bert_heads.pt"
+
+# ========================================================================================
+# EMBEDDED API CREDENTIALS & IN-FILE CONFIGURATION (100% SELF-CONTAINED)
+# ========================================================================================
+# You do NOT need any .env file, Colab secrets, or external keys.
+# Update or replace your keys directly here inside the file:
+EMBEDDED_GEMINI_API_KEY = ""
+EMBEDDED_GROQ_API_KEY = ""
+EMBEDDED_OPENAI_API_KEY = ""
 
 # Structured logging
 logger = logging.getLogger("DLKR_LJP")
@@ -49,7 +61,16 @@ if not logger.handlers:
 IS_COLAB = "google.colab" in sys.modules or os.path.exists("/content")
 if IS_COLAB:
     BASE_DIR = Path("/content/dlkr_ljp_runtime")
-    PERSIST_DIR = Path("/content/drive/MyDrive/DLKR_LJP_Indian_Law")
+    try:
+        from google.colab import drive
+        if not os.path.exists("/content/drive/MyDrive"):
+            drive.mount("/content/drive", force_remount=False)
+    except Exception:
+        pass
+    if os.path.exists("/content/drive/MyDrive"):
+        PERSIST_DIR = Path("/content/drive/MyDrive/DLKR_LJP_Indian_Law")
+    else:
+        PERSIST_DIR = BASE_DIR / "checkpoints"
 else:
     BASE_DIR = Path(__file__).resolve().parent / "runtime_data"
     PERSIST_DIR = BASE_DIR / "checkpoints"
@@ -445,10 +466,11 @@ STATUTES_REGISTRY: Dict[str, Dict[str, Any]] = {
         "title": "Criminal Breach of Trust (IPC Section 406 / BNS Section 316)",
         "charge": "Criminal Breach of Trust",
         "offence_name": "Criminal Breach of Trust",
-        "statutory_ceiling": "Strict 3-Year Ceiling (Tier 1)",
+        "statutory_ceiling": "3 Years (IPC 406) / 5 Years (BNS 316(2))",
         "statutory_floor": "None",
         "authorized_tiers": [
-            "Tier 1: Up to 3 Years (Minor / Summary Offence)"
+            "Tier 1: Up to 3 Years (Minor / Summary Offence)",
+            "Tier 2: 3 to 7 Years (Arnesh Kumar Threshold / Medium Penalty)"
         ],
         "default_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
         "bailable": False,
@@ -460,7 +482,7 @@ STATUTES_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Dishonest misappropriation or conversion to own use",
             "Violation of direction of law or contract prescribing mode of discharge"
         ],
-        "content": "Section 406 IPC / Section 316(2) BNS: Whoever commits criminal breach of trust shall be punished with imprisonment up to 3 years, or with fine, or both.",
+        "content": "Section 406 IPC / Section 316(2) BNS: Whoever commits criminal breach of trust shall be punished with imprisonment up to 3 years under IPC 406 or up to 5 years under BNS Section 316(2), or with fine, or both.",
         "precedents": [
             {
                 "id": "PREC_VIJAYASARATHY_BREACH_TRUST",
@@ -934,6 +956,7 @@ LAW_ARTICLES: List[str] = list(STATUTES_REGISTRY.keys())
 CRIMINAL_CHARGES: List[str] = [
     "Murder & Culpable Homicide",
     "Culpable Homicide (Sudden Fight / Heat of Passion)",
+    "Rash and Negligent Act Causing Death",
     "Attempt to Murder",
     "Sexual Offences & Assault",
     "Cheating & Financial Fraud",
@@ -1064,6 +1087,7 @@ class AtomicCaseFacts:
     # Temporal & Statutory Regime
     incident_date: Optional[str] = None
     incident_regime: str = "AUTO"       # "BNS_2023" vs "IPC_1860"
+    incident_date_uncertain: bool = False
 
     # General / Collective
     multiple_accused: bool = False
@@ -1148,21 +1172,28 @@ class OpenNyAILegalNER:
                 entities["statutes"].append("IPC")
             if re.search(r"\b(bns|bharatiya\s+nyaya\s+sanhita)\b", t_low):
                 entities["statutes"].append("BNS")
-            offence_matches = re.findall(r"\b(murder|culpable\s+homicide|theft|robbery|dacoity|extortion|cheating|fraud|scam|forgery|rape|sexual\s+assault|criminal\s+breach\s+of\s+trust|dowry\s+death|cruelty|grievous\s+hurt|simple\s+hurt|attempt\s+to\s+murder|rash\s+driving|intimidation)\b", t_low)
+            offence_matches = re.findall(r"\b(murder|culpable\s+homicide|theft|robbery|dacoity|extortion|cheating|forgery|rape|criminal\s+breach\s+of\s+trust|dowry\s+death|cruelty)\b", t_low)
             if offence_matches:
                 entities["offences"] = list(set(offence_matches))
             return entities
 
         try:
-            doc = self.nlp(text[:2500])
-            for ent in doc.ents:
-                lbl = ent.label_.upper()
-                if lbl in ["PROVISION", "SECTION"]:
-                    entities["provisions"].append(ent.text.strip())
-                elif lbl in ["STATUTE", "ACT"]:
-                    entities["statutes"].append(ent.text.strip())
-                elif lbl in ["OFFENCE", "CRIME"]:
-                    entities["offences"].append(ent.text.strip())
+            chunk_size = 2000
+            # Process long legal judgments in multi-window chunks up to 10,000 characters
+            for start_idx in range(0, min(len(text), 10000), chunk_size):
+                chunk = text[start_idx:start_idx + chunk_size]
+                doc = self.nlp(chunk)
+                for ent in doc.ents:
+                    lbl = ent.label_.upper()
+                    if lbl in ["PROVISION", "SECTION"]:
+                        entities["provisions"].append(ent.text.strip())
+                    elif lbl in ["STATUTE", "ACT"]:
+                        entities["statutes"].append(ent.text.strip())
+                    elif lbl in ["OFFENCE", "CRIME"]:
+                        entities["offences"].append(ent.text.strip())
+            entities["provisions"] = list(set(entities["provisions"]))
+            entities["statutes"] = list(set(entities["statutes"]))
+            entities["offences"] = list(set(entities["offences"]))
             return entities
         except Exception as e:
             logger.warning(f"[OpenNyAI Warning] Error in entity extraction ({e}).")
@@ -1244,6 +1275,11 @@ class AtomicLegalFactExtractor:
             "simple_hurt": [
                 "slapped punched scuffle superficial bruises abrasions without fracture",
                 "caused simple hurt with bare hands minor scuffle"
+            ],
+            "rash_driving": [
+                "rash and negligent driving causing fatal accident death on public highway road",
+                "speeding motor vehicle hit pedestrian causing death by negligence 304a 106 bns",
+                "reckless driving vehicular accident causing grievous injury or death"
             ]
         }
 
@@ -1280,58 +1316,107 @@ class AtomicLegalFactExtractor:
         detected_offences = [o.lower() for o in opennyai_ents.get("offences", [])]
 
         # ---------------- 0. TEMPORAL & REGIME DETECTION ----------------
-        # Look for dates in narrative (e.g., 3 March 2025, July 2024, etc.)
         bns_cutoff = datetime(2024, 7, 1)
-        parsed_date = None
-        date_str = None
+        facts.incident_regime = "IPC_1860"
+        facts.incident_date_uncertain = False
 
-        m_date1 = re.search(r"\b(\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b", text_lower)
-        m_date2 = re.search(r"\b((?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b", text_lower)
-        m_date3 = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text_lower)
+        incident_date_patterns = [
+            r"\b(?:(?:alleged\s+)?incident\s+(?:occurred|took\s+place|happened)(?:\s+on)?|offence\s+committed(?:\s+on)?|committed\s+on|on\s+or\s+about|alleged\s+incident\s+dated|on\s+(?:the\s+night|morning|evening|afternoon|day)\s+of)\s+(\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b",
+            r"\b(?:(?:alleged\s+)?incident\s+(?:occurred|took\s+place|happened)(?:\s+on)?|offence\s+committed(?:\s+on)?|committed\s+on|on\s+or\s+about|alleged\s+incident\s+dated|on\s+(?:the\s+night|morning|evening|afternoon|day)\s+of)\s+((?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b",
+            r"\b(?:(?:alleged\s+)?incident\s+(?:occurred|took\s+place|happened)(?:\s+on)?|offence\s+committed(?:\s+on)?|committed\s+on|on\s+or\s+about|alleged\s+incident\s+dated|on\s+(?:the\s+night|morning|evening|afternoon|day)\s+of)\s+(\d{4}-\d{2}-\d{2})\b"
+        ]
 
-        if m_date1:
-            date_str = m_date1.group(1)
-            try:
-                parsed_date = datetime.strptime(date_str, "%d %B %Y")
-            except ValueError:
-                pass
-        elif m_date2:
-            date_str = m_date2.group(1)
-            try:
-                parsed_date = datetime.strptime(date_str, "%B %Y")
-            except ValueError:
-                pass
-        elif m_date3:
-            date_str = m_date3.group(1)
-            try:
-                parsed_date = datetime.strptime(date_str, "%Y-%m-%d")
-            except ValueError:
-                pass
+        procedural_date_patterns = [
+            r"\b(?:fir\s+(?:registered|lodged|dated|no\.?)|registered\s+on|complaint\s+lodged\s+on|hearing\s+held\s+on|decided\s+on|judgment\s+dated|chargesheet\s+dated)\s+(\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b",
+            r"\b(?:fir\s+(?:registered|lodged|dated|no\.?)|registered\s+on|complaint\s+lodged\s+on|hearing\s+held\s+on|decided\s+on|judgment\s+dated|chargesheet\s+dated)\s+((?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b",
+            r"\b(?:fir\s+(?:registered|lodged|dated|no\.?)|registered\s+on|complaint\s+lodged\s+on|hearing\s+held\s+on|decided\s+on|judgment\s+dated|chargesheet\s+dated)\s+(\d{4}-\d{2}-\d{2})\b"
+        ]
 
-        if parsed_date:
-            facts.incident_date = date_str
-            if parsed_date >= bns_cutoff:
-                facts.incident_regime = "BNS_2023"
-            else:
-                facts.incident_regime = "IPC_1860"
+        def _try_parse_dt(d_str: str) -> Optional[datetime]:
+            for fmt in ("%d %B %Y", "%B %Y", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(d_str, fmt)
+                except ValueError:
+                    pass
+            return None
+
+        found_inc_dt = None
+        found_inc_str = None
+        for pat in incident_date_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                dt = _try_parse_dt(m.group(1))
+                if dt:
+                    found_inc_dt = dt
+                    found_inc_str = m.group(1)
+                    break
+
+        found_pr_dt = None
+        found_pr_str = None
+        for pat in procedural_date_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                dt = _try_parse_dt(m.group(1))
+                if dt:
+                    found_pr_dt = dt
+                    found_pr_str = m.group(1)
+                    break
+
+        # Fallback generic date scanning
+        generic_dates = []
+        for m in re.finditer(r"\b(\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b", text_lower):
+            dt = _try_parse_dt(m.group(1))
+            if dt:
+                generic_dates.append((dt, m.group(1)))
+        for m in re.finditer(r"\b((?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b", text_lower):
+            dt = _try_parse_dt(m.group(1))
+            if dt:
+                generic_dates.append((dt, m.group(1)))
+        for m in re.finditer(r"\b(\d{4}-\d{2}-\d{2})\b", text_lower):
+            dt = _try_parse_dt(m.group(1))
+            if dt:
+                generic_dates.append((dt, m.group(1)))
+
+        if found_inc_dt:
+            facts.incident_date = found_inc_str
+            facts.incident_regime = "BNS_2023" if found_inc_dt >= bns_cutoff else "IPC_1860"
+            facts.incident_date_uncertain = False
+        elif found_pr_dt:
+            facts.incident_date = found_pr_str
+            facts.incident_date_uncertain = True
+            facts.incident_regime = "BNS_2023" if found_pr_dt >= bns_cutoff else "IPC_1860"
+            facts.mitigating_defenses.append(f"Regime Uncertainty: Date '{found_pr_str}' appears to be procedural (FIR/Hearing). Applied regime with uncertainty flag.")
+        elif generic_dates:
+            dt, d_str = generic_dates[0]
+            facts.incident_date = d_str
+            facts.incident_date_uncertain = True
+            facts.incident_regime = "BNS_2023" if dt >= bns_cutoff else "IPC_1860"
+            facts.mitigating_defenses.append(f"Regime Uncertainty: Date '{d_str}' lacks incident occurrence linkage. Applied regime with uncertainty flag.")
         else:
+            facts.incident_date = None
+            facts.incident_date_uncertain = True
             facts.incident_regime = "IPC_1860"
+            facts.mitigating_defenses.append("Temporal Regime Uncertainty: Date of offence unspecified in narrative. Defaulted to IPC regime with uncertainty flag.")
 
         # ---------------- 1. OUT OF DOMAIN CHECK ----------------
         crime_indicators = [
-            "accused", "victim", "deceased", "complainant", "police", "fir", "killed", "died", "dead",
-            "murder", "assault", "stabbed", "shot", "weapon", "knife", "gun", "pistol", "theft", "stole",
-            "stolen", "robbery", "robbed", "cheated", "fraud", "forged", "dowry", "rape", "threatened",
-            "contract", "dispute", "injuries", "injury", "laceration", "fracture", "homicide", "quarrel",
-            "fight", "lifted", "snatched", "pocketed", "pickpocket", "extorted", "caught", "removes",
-            "removed", "cashier", "suspect", "offence", "crime", "misappropriat", "slapped",
-            "beaten", "attacked", "falsely", "eyewitness", "investigation", "sessions court", "magistrate court", "high court", "supreme court", "trial court", "court of law", "ipc", "bns",
-            "took", "taking", "bangle", "wallet", "purse", "money", "cheque", "will", "deed"
+            "accused", "victim", "deceased", "complainant", "police", "fir", "chargesheet", "charge-sheet",
+            "killed", "murder", "culpable homicide", "manslaughter", "assault", "assaulted", "stabbed",
+            "shot dead", "weapon", "knife", "gun", "pistol", "revolver", "dagger", "theft", "stole",
+            "stolen", "robbery", "robbed", "dacoity", "cheated", "defrauded", "forged", "forgery", "dowry",
+            "rape", "sexual assault", "extorted", "extortion", "homicide", "quarrel", "fight", "beaten",
+            "attacked", "grievous hurt", "laceration", "fracture", "misappropriat", "offence", "crime",
+            "slapped", "eyewitness", "investigation", "sessions court", "magistrate court", "high court",
+            "supreme court", "trial court", "court of law", "ipc", "bns", "crpc", "bnss", "penal code",
+            "cognizable", "rash driving", "negligent driving", "rash and negligent", "hit and run",
+            "quashing", "quash", "commercial dispute", "arbitration", "succumbed", "heat of passion",
+            "premeditation", "iron rod", "lathi", "injuries", "injury", "previous record", "pilfered",
+            "pickpocket", "lifted unnoticed", "caught with the"
         ]
         has_crime_ind = any(re.search(r"\b" + kw + r"\b", text_lower) for kw in crime_indicators)
-        has_dense_signal = any(self.score(text, d) > 0.12 for d in ["theft", "robbery", "cheating", "sexual_assault", "fatal_death", "dangerous_weapon"])
-
+        has_dense_signal = any(self.score(text, d) > 0.35 for d in ["theft", "robbery", "cheating", "sexual_assault", "fatal_death", "dangerous_weapon", "rash_driving", "civil_quashing"])
         has_ner_ind = bool(detected_provisions) or bool(detected_offences)
+
         if not has_crime_ind and not has_dense_signal and not has_ner_ind:
             facts.is_out_of_domain = True
             facts.mitigating_defenses.append("Non-Legal / Out of Domain Narrative")
@@ -1347,17 +1432,45 @@ class AtomicLegalFactExtractor:
             facts.mitigating_defenses.append("Right of Private Defence (s.96-106 IPC / s.34-44 BNS)")
 
         # ---------------- 3. WEAPON EXTRACTION & SCOPED NEGATIONS ----------------
+        def _is_weapon_negated(text_l: str, start_pos: int, end_pos: int) -> bool:
+            window_start = max(0, start_pos - 60)
+            preceding = text_l[window_start:start_pos].strip()
+            neg_regex = r"\b(did\s+not|didn't|didnt|not|neither|nor|no|never|without\s+(?:using|wielding|carrying|employing|having)?|denied\s+(?:using|having)?|refrained\s+from\s+using|was\s+not\s+armed|unarmed)\s*(?:use|used|using|wield|wielded|wielding|carry|carried|carrying|have|had|possess|possessed)?\s*(?:any|a|an|the)?\s*$"
+            if bool(re.search(neg_regex, preceding)):
+                return True
+            sentence_prefix = preceding.split(".")[-1].strip()
+            if bool(re.search(r"\b(did\s+not|didn't|never|no|without)\b", sentence_prefix)):
+                return True
+            return False
+
+        def _find_non_negated(pat: str, text_l: str) -> List[str]:
+            res = []
+            for m in re.finditer(pat, text_l):
+                if not _is_weapon_negated(text_l, m.start(), m.end()):
+                    res.append(m.group(1))
+            return res
+
         victim_unarmed = bool(re.search(r"\b(victim|complainant|deceased|passenger)\s+(was\s+)?(completely\s+|totally\s+)?(unarmed|without\s+weapons?)\b", text_lower))
-        accused_unarmed = bool(re.search(r"\b(accused|assailant|culprit|attacker|he|she)\s+(was\s+)?(unarmed|without\s+weapons?)\b", text_lower)) or (
+        accused_unarmed_claim = bool(re.search(r"\b(accused|assailant|culprit|attacker|he|she)\s+(was\s+)?(unarmed|without\s+weapons?)\b", text_lower)) or (
             bool(re.search(r"\b(without\s+(any\s+)?weapons?|no\s+weapons?\s+(used|carried|found|involved))\b", text_lower)) and not victim_unarmed
         )
 
-        lethal_matches = re.findall(r"\b(guns?|pistols?|revolvers?|rifles?|firearms?|gunshots?|gunpoint)\b", text_lower)
-        sharp_matches = re.findall(r"\b(sharp knives|sharp knife|knives|knife|daggers?|swords?|machetes?|blades?|axes?|knifepoint)\b", text_lower)
-        blunt_matches = re.findall(r"\b(iron rods?|iron bars?|lathis?|wooden clubs?|clubs?|crowbars?|stones?|bricks?|sticks?)\b", text_lower)
-        poison_matches = re.findall(r"\b(pesticides?|insecticides?|poisons?|toxic\s+substances?|arsenic|cyanide|laced|noxious\s+substances?|chemicals?)\b", text_lower)
+        lethal_matches = _find_non_negated(r"\b(gun|pistol|revolver|rifle|firearm|gunshots?)\b", text_lower)
+        sharp_matches = _find_non_negated(r"\b(sharp knife|knife|dagger|sword|machete|blade|axe)\b", text_lower)
+        blunt_matches = _find_non_negated(r"\b(iron rod|iron bar|lathi|wooden club|crowbar|stone|brick|stick)\b", text_lower)
 
-        if not accused_unarmed:
+        # Poison matches: exclude benign agricultural/commercial chemicals
+        poison_matches = []
+        is_benign_chem = bool(re.search(r"\bchemical\s+(?:fertiliser|fertilizer|industry|factory|engineering|plant|reaction|formula)\b", text_lower))
+        if not is_benign_chem:
+            for m in re.finditer(r"\b(pesticide|insecticide|poison|arsenic|cyanide|laced|toxic\s+substance|noxious\s+substance|chemical\s+poison|toxic\s+chemical|lethal\s+chemical)\b", text_lower):
+                if not _is_weapon_negated(text_lower, m.start(), m.end()):
+                    poison_matches.append(m.group(1))
+
+        was_weapon_negated = bool(re.search(r"\b(did\s+not\s+use|didn't\s+use|no\s+weapon|without\s+(?:a\s+|any\s+)?(?:weapon|knife|gun|pistol|rod|stick))\b", text_lower))
+        is_actually_unarmed = accused_unarmed_claim or (was_weapon_negated and not (lethal_matches or sharp_matches or blunt_matches or poison_matches))
+
+        if not is_actually_unarmed:
             if poison_matches:
                 facts.weapon_used = poison_matches[0]
                 facts.weapon_category = "Poison / Chemical Lethal"
@@ -1371,6 +1484,7 @@ class AtomicLegalFactExtractor:
                 facts.weapon_used = blunt_matches[0]
                 facts.weapon_category = "Blunt Heavy (Iron Rod/Lathi)"
             else:
+                facts.weapon_used = None
                 facts.weapon_category = "Unarmed"
         else:
             facts.weapon_used = None
@@ -1387,7 +1501,6 @@ class AtomicLegalFactExtractor:
             facts.weapon_source = "Unarmed"
 
         # ---------------- 4. INJURY SEVERITY & HOMICIDE GUARDS ----------------
-        # Guard against bare word 'death' in legal/hypothetical discourse
         is_death_discourse = bool(re.search(r"\b(death\s+penalty|sentence\s+of\s+death|capital\s+punishment|under\s+threat\s+of\s+death|fear\s+of\s+death|threatened\s+with\s+death)\b", text_lower))
         actual_fatality = bool(re.search(r"\b(died|dead|deceased|corpse|killed|killing|shot\s+dead|succumbed|post-mortem|fatal|decapitated|murdered|to\s+death|caused.*death|beaten\s+to\s+death|hacked\s+to\s+death|stabbed\s+to\s+death|strangled.*to\s+death|found\s+dead|body\s+of\s+(the\s+)?deceased)\b", text_lower))
         has_survive_word = bool(re.search(r"\b(survived|discharged|treated\s+with\s+stitches|victim\s+is\s+alive|non-fatal|recovering)\b", text_lower))
@@ -1397,11 +1510,31 @@ class AtomicLegalFactExtractor:
             has_fatal_outcome = False
 
         has_murderous_intent = bool(re.search(r"\b(intent\s+to\s+kill|intending\s+to\s+kill|intention\s+to\s+kill|intent\s+to\s+cause\s+death|intended\s+to\s+murder|aiming\s+at\s+(the\s+)?(chest|head|neck|abdomen)|stabbed\s+(?:[a-z\s]+)?in\s+the\s+(abdomen|chest|neck)|fired\s+(pistol|gun|shots)\s+at)\b", text_lower))
-        has_grievous = bool(re.search(r"\b(fracture|grievous|broken\s+(bone|arm|leg|rib|skull)|loss\s+of\s+eye|deep\s+laceration|vital\s+organ|permanent\s+disability|icu|deep\s+puncture|severe\s+bleeding|deep\s+(?:knife\s+)?wounds?|stab\s+wounds?|knife\s+wounds?)\b", text_lower))
-        has_simple = bool(re.search(r"\b(slapped|slap|fists?|punches?|bruises?|contusions?|abrasions?|superficial|simple\s+hurt|minor\s+cuts?|non-grievous|wounds?)\b", text_lower))
+        has_grievous = bool(re.search(r"\b(fracture|grievous|broken\s+(bone|arm|leg|rib|skull)|loss\s+of\s+eye|deep\s+laceration|vital\s+organ|permanent\s+disability|icu|deep\s+puncture|severe\s+bleeding)\b", text_lower))
+        has_simple = bool(re.search(r"\b(slapped|slap|fists?|punches?|bruises?|contusions?|abrasions?|superficial|simple\s+hurt|minor\s+cuts?|non-grievous)\b", text_lower))
 
-        # Check for rash driving / accident death
-        if bool(re.search(r"\b(rash\s+and\s+negligent|rash\s+driving|negligent\s+driving|motor\s+accident|car\s+accident|vehicular\s+accident|speeding\s+car|hit\s+and\s+run)\b", text_lower)):
+        vehicular_pattern = (
+            r"\b("
+            r"rash\s+(?:and\s+)?negligent|"
+            r"rash\s+driving|"
+            r"negligent\s+driving|"
+            r"reckless\s+driving|"
+            r"motor\s+accident|"
+            r"car\s+accident|"
+            r"vehicular\s+(?:accident|collision)|"
+            r"(?:driving|drove|operated|riding|rode)\s+(?:a\s+)?(?:heavy\s+goods\s+|speeding\s+|commercial\s+)?(?:truck|car|bus|lorry|vehicle|van|motorcycle|scooter|two-wheeler|dumper|tanker)|"
+            r"speeding\s+(?:car|truck|bus|vehicle|lorry|motorcycle)|"
+            r"at\s+\d+\s*(?:km/?(?:h|ph|hr)|miles\s+per\s+hour)|"
+            r"jumped\s+(?:a\s+)?(?:red\s+)?(?:traffic\s+)?(?:signal|light)|"
+            r"(?:hit|struck|rammed|ran\s+over|knocked\s+down)\s+(?:a\s+)?(?:scooterist|pedestrian|motorcyclist|biker|cyclist|walker|commuter|two-wheeler|scooter|bike|person|victim)|"
+            r"(?:hit|struck|rammed)\s+(?:from\s+behind|head[- ]on)|"
+            r"hit\s+and\s+run|"
+            r"school\s+zone|"
+            r"traffic\s+signal|"
+            r"culpable\s+negligence"
+            r")\b"
+        )
+        if bool(re.search(vehicular_pattern, text_lower)):
             facts.is_rash_driving = True
             facts.mitigating_defenses.append("Rash or Negligent Act (s.304A IPC / s.106 BNS)")
 
@@ -1423,68 +1556,38 @@ class AtomicLegalFactExtractor:
 
         # ---------------- 5. PREMEDITATION VS EXCEPTION 4 SUDDEN FIGHT ----------------
         negated_premed = bool(re.search(r"\b(no|without|neither)\s+(prior\s+)?(enmity|animosity|planning|premeditation|grudge)\b", text_lower)) or bool(re.search(r"\b(not\s+planned|unplanned|spontaneous)\b", text_lower))
-        positive_premed = bool(re.search(r"\b(lay\s+in\s+wait|ambushed|premeditated|prior\s+enmity|rivalry|long\s+standing\s+grudge|planned\s+in\s+advance|made\s+a\s+plan|hatched\s+a\s+(plan|conspiracy)|purchased\s+in\s+advance|bought\s+in\s+advance|procured\s+in\s+advance|laced|poison|pesticide|arsenic|cyanide)\b", text_lower))
+        positive_premed = bool(re.search(r"\b(lay\s+in\s+wait|ambushed|premeditated|prior\s+enmity|rivalry|long\s+standing\s+grudge|planned\s+in\s+advance|made\s+a\s+plan|hatched\s+a\s+(plan|conspiracy)|purchased\s+in\s+advance|bought\s+in\s+advance|procured\s+in\s+advance|laced\s+with\s+poison|arsenic|cyanide)\b", text_lower))
 
-        if (positive_premed or facts.weapon_category == "Poison / Chemical Lethal") and not negated_premed:
+        if (positive_premed or (facts.weapon_category == "Poison / Chemical Lethal" and poison_matches)) and not negated_premed:
             facts.has_premeditation = True
         elif self.score(text, "sudden_fight") > 0.15 or re.search(r"\b(sudden|heat\s+of\s+passion|quarrel|argument|shoved|spontaneous\s+altercation|street\s+brawl|brawl)\b", text_lower):
             facts.is_sudden_fight = True
             facts.is_heat_of_passion = True
             facts.single_blow = bool(re.search(r"\b(once|single\s+blow|struck.*once|one\s+strike)\b", text_lower))
 
-        # ---------------- 5.5 OPENNYAI PRETRAINED LEGAL ENTITY SIGNALS ----------------
-        has_prov = lambda num: any(num in p for p in detected_provisions)
-        has_off = lambda kw: any(kw in o for o in detected_offences)
-
-        if has_prov("302") or has_off("murder"):
-            if facts.injury_severity == "Fatal (Death)":
-                facts.has_premeditation = True
-        if has_prov("304") or has_off("culpable homicide"):
-            if facts.injury_severity == "Fatal (Death)":
-                facts.is_sudden_fight = True
-        if has_prov("307") or has_off("attempt to murder"):
-            facts.attempt_murder_intent = True
-        if has_prov("376") or has_off("rape") or has_off("sexual assault"):
-            facts.is_sexual_offence = True
-        if has_prov("392") or has_off("robbery"):
-            facts.is_robbery = True
-        if has_prov("379") or has_off("theft"):
-            if not facts.is_robbery:
-                facts.is_theft = True
-        if has_prov("420") or has_off("cheating") or has_off("fraud") or has_off("scam"):
-            if facts.injury_severity != "Fatal (Death)":
-                facts.is_cheating = True
-                facts.is_commercial = True
-        if has_prov("406") or has_off("breach of trust") or has_off("misappropriat"):
-            if facts.injury_severity != "Fatal (Death)":
-                facts.is_breach_of_trust = True
-                facts.is_commercial = True
-        if has_prov("498a") or has_off("cruelty"):
-            facts.is_matrimonial_cruelty = True
-            facts.is_matrimonial = True
-        if has_prov("304b") or has_off("dowry death"):
-            facts.is_dowry_death = True
-            facts.is_matrimonial = True
-        if has_prov("326") or has_off("grievous hurt"):
-            facts.injury_severity = "Grievous (Fracture/Vital)"
-        if any(has_prov(p) for p in ["467", "468", "471"]) or has_off("forgery"):
-            facts.has_forged_documents = True
+        # ---------------- 5.5 OPENNYAI LEGAL ENTITY SIGNALS ----------------
+        if "cheating" in detected_offences or any("420" in p for p in detected_provisions):
+            facts.is_cheating = True
             facts.is_commercial = True
+        if "rape" in detected_offences or any("376" in p for p in detected_provisions):
+            facts.is_sexual_offence = True
+        if "robbery" in detected_offences or any("392" in p for p in detected_provisions):
+            facts.is_robbery = True
 
         # ---------------- 6. PROPERTY OFFENCES: THEFT VS ROBBERY ----------------
         is_negated_force = bool(re.search(r"\b(without\s+(using\s+|resorting\s+to\s+)?(force|violence|physical\s+force|assault)|no\s+(force|violence|assault)|not\s+using\s+force|peacefully|quietly)\b", text_lower))
         is_negated_threat = bool(re.search(r"\b(without\s+(making\s+|giving\s+|issuing\s+)?threats?|no\s+threats?|not\s+threatening)\b", text_lower))
 
-        has_positive_force = bool(re.search(r"\b(held\s+.*?(knife|gun)point|pointed\s+a\s+(knife|gun)|physically\s+assaulted|manhandled|brandished|grabbed\s+and\s+dragged|extorted\s+under\s+threat)\b", text_lower)) and not is_negated_force
-        has_positive_threat = bool(re.search(r"\b(under\s+threat\s+of\s+(instant\s+)?death|fear\s+of\s+(instant\s+)?(hurt|death)|held\s+to\s+throat|threatened\s+with\s+death|at\s+(gun|knife)point|gunpoint|knifepoint)\b", text_lower)) and not is_negated_threat
+        has_positive_force = bool(re.search(r"\b(held\s+at\s+(knife|gun)point|pointed\s+a\s+(knife|gun)|physically\s+assaulted|manhandled|brandished|grabbed\s+and\s+dragged|extorted\s+under\s+threat)\b", text_lower)) and not is_negated_force
+        has_positive_threat = bool(re.search(r"\b(under\s+threat\s+of\s+(instant\s+)?death|fear\s+of\s+(instant\s+)?(hurt|death)|held\s+to\s+throat|threatened\s+with\s+death)\b", text_lower)) and not is_negated_threat
 
         has_theft_taking = bool(re.search(r"\b(stole|stolen|stealing|steal|lifted|pocketed|snatched|pilfered|pickpocket|took|taken|removed)\b.*?\b(phone|mobile|wallet|purse|watch|gold|chain|bag|bangle|cash|money|property|belongings|handbag|smartphone)\b", text_lower)) or bool(re.search(r"\b(dishonest\s+taking|took\s+[a-z\s]+without\s+consent)\b", text_lower))
         has_extortion_taking = bool(re.search(r"\b(extorted|extort|extorting|extortion|demanded\s+(?:cash|money|wallet|phone)|looted|robbed)\b", text_lower))
-        has_property_or_extortion = has_theft_taking or has_extortion_taking or self.score(text, "robbery") > 0.15
+        has_property_or_extortion = has_theft_taking or has_extortion_taking or ("robbery" in detected_offences) or ("dacoity" in detected_offences)
 
         is_robbery_case = (
             has_property_or_extortion
-            and (has_positive_force or has_positive_threat or (facts.weapon_used and not accused_unarmed))
+            and (has_positive_force or has_positive_threat or (facts.weapon_used and not accused_unarmed_claim))
             and not is_negated_force
             and not is_negated_threat
         )
@@ -1509,9 +1612,7 @@ class AtomicLegalFactExtractor:
             facts.is_valuable_security = True
 
         is_negated_cheat = bool(re.search(r"\b(no\s+cheating|no\s+fraud|not\s+cheat|no\s+deception|no\s+fraudulent\s+intent)\b", text_lower))
-        has_job_or_money_scam = bool(re.search(r"\b(promised\s+.*jobs?|job\s+promise|fake\s+job|in\s+exchange\s+for\s+(?:rs|cash|money)|vanished\s+with\s+(?:money|cash)|collected\s+money|siphoned\s+funds)\b", text_lower))
-        is_fatal_case = (facts.injury_severity == "Fatal (Death)")
-        if not is_negated_cheat and not is_fatal_case and (has_job_or_money_scam or (self.score(text, "cheating") > 0.20 and facts.injury_severity == "None") or re.search(r"\b(cheated|deceived|dishonestly\s+induced|false\s+promises?|fraudulent\s+representation|section\s+420)\b", text_lower)):
+        if not is_negated_cheat and (self.score(text, "cheating") > 0.18 or re.search(r"\b(cheated|deceived|dishonestly\s+induced|fake\s+job|job\s+promise|false\s+promises?|fraudulent\s+representation|section\s+420)\b", text_lower)):
             facts.is_cheating = True
             facts.is_commercial = True
             facts.is_theft = False
@@ -1570,25 +1671,314 @@ class AtomicLegalFactExtractor:
 
 
 # ============================================================
-# 3. PRETRAINED LEGAL REASONER
+# 3. UNIVERSAL LEGAL LLM API CLIENT & REASONER
 # ============================================================
+class UniversalLegalApiClient:
+    """
+    Zero-dependency Universal Legal LLM API Client using Python standard library (urllib.request).
+    Supports:
+    1. Google Gemini (GEMINI_API_KEY) - gemini-2.0-flash / gemini-1.5-flash
+    2. Groq Cloud (GROQ_API_KEY) - llama-3.3-70b-versatile
+    3. OpenAI (OPENAI_API_KEY) - gpt-4o-mini
+    """
+    def __init__(self):
+        # 1. Check embedded in-file key first as default, then environment overrides
+        self.gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or EMBEDDED_GEMINI_API_KEY.strip()
+        self.groq_key = os.environ.get("GROQ_API_KEY", "").strip() or EMBEDDED_GROQ_API_KEY.strip()
+        self.openai_key = os.environ.get("OPENAI_API_KEY", "").strip() or EMBEDDED_OPENAI_API_KEY.strip()
+
+        # 2. Colab Secrets resolution (if configured)
+        if not (self.gemini_key or self.groq_key or self.openai_key):
+            try:
+                from google.colab import userdata
+                self.gemini_key = userdata.get("GEMINI_API_KEY") or ""
+                self.groq_key = userdata.get("GROQ_API_KEY") or ""
+            except Exception:
+                pass
+
+        # 3. Multi-path .env resolution
+        if not (self.gemini_key or self.groq_key or self.openai_key):
+            candidate_envs = [
+                Path(__file__).resolve().parent / ".env" if "__file__" in globals() else Path(".env"),
+                Path(".env"),
+                Path("/content/.env")
+            ]
+            for env_path in candidate_envs:
+                if env_path.exists():
+                    try:
+                        with open(env_path, "r", encoding="utf-8") as f:
+                            for line in f:
+                                line_str = line.strip()
+                                if line_str.startswith("GEMINI_API_KEY=") and not self.gemini_key:
+                                    self.gemini_key = line_str.split("=", 1)[1].strip().strip('"').strip("'")
+                                elif line_str.startswith("GROQ_API_KEY=") and not self.groq_key:
+                                    self.groq_key = line_str.split("=", 1)[1].strip().strip('"').strip("'")
+                                elif line_str.startswith("OPENAI_API_KEY=") and not self.openai_key:
+                                    self.openai_key = line_str.split("=", 1)[1].strip().strip('"').strip("'")
+                    except Exception:
+                        pass
+                if self.gemini_key or self.groq_key or self.openai_key:
+                    break
+
+    def is_available(self) -> bool:
+        return bool(self.gemini_key or self.groq_key or self.openai_key)
+
+    def get_provider_name(self) -> str:
+        if self.gemini_key:
+            return "Google Gemini (gemini-3.1-flash-lite / 3-flash Zero-Shot API)"
+        elif self.groq_key:
+            return "Groq Cloud (llama-3.3-70b-versatile Zero-Shot API)"
+        elif self.openai_key:
+            return "OpenAI (gpt-4o-mini Zero-Shot API)"
+        return "Offline Deterministic Rule Engine"
+
+    def reason(self, fact_text: str) -> Optional[Dict[str, Any]]:
+        if not self.is_available():
+            return None
+
+        system_prompt = (
+            "You are a Senior Indian Criminal Law Adjudicator specializing in the Indian Penal Code (IPC 1860) "
+            "and Bharatiya Nyaya Sanhita (BNS 2023). Analyze the factual narrative and return ONLY a valid JSON object "
+            "with exact factual extraction and judicial statutory reasoning.\n"
+            "Return JSON with the following exact keys:\n"
+            "{\n"
+            '  "is_out_of_domain": false,\n'
+            '  "is_purely_civil": false,\n'
+            '  "actus_reus": "Detailed description of physical criminal acts",\n'
+            '  "mens_rea": "Detailed state of mind (e.g. criminal negligence, premeditated intention, knowledge, or absence of intent)",\n'
+            '  "injury_severity": "Fatal (Death)" | "Grievous (Fracture/Vital)" | "Simple Hurt" | "Surviving / Non-Fatal" | "None",\n'
+            '  "weapon_used": string or null,\n'
+            '  "weapon_category": "Firearm/Lethal" | "Sharp/Cutting (Knife/Dagger)" | "Blunt Heavy (Iron Rod/Lathi)" | "Poison / Chemical Lethal" | "Unarmed",\n'
+            '  "has_premeditation": false,\n'
+            '  "is_sudden_fight": false,\n'
+            '  "is_heat_of_passion": false,\n'
+            '  "single_blow": false,\n'
+            '  "is_rash_driving": false,\n'
+            '  "is_theft": false,\n'
+            '  "is_robbery": false,\n'
+            '  "is_breach_of_trust": false,\n'
+            '  "is_cheating": false,\n'
+            '  "has_forged_documents": false,\n'
+            '  "is_valuable_security": false,\n'
+            '  "is_sexual_offence": false,\n'
+            '  "sexual_offence_negated": false,\n'
+            '  "is_matrimonial_cruelty": false,\n'
+            '  "is_dowry_death": false,\n'
+            '  "multiple_accused": false,\n'
+            '  "is_conspiracy": false,\n'
+            '  "threat_to_cause_death": false,\n'
+            '  "incident_date": "YYYY-MM-DD or null",\n'
+            '  "incident_regime": "IPC_1860" | "BNS_2023",\n'
+            '  "is_date_uncertain": true,\n'
+            '  "primary_article_ipc": "IPC 304A" | "IPC 302" | "IPC 304 Part II" | "IPC 379" | "IPC 392" | "IPC 420" | etc.,\n'
+            '  "primary_article_bns": "BNS 106(1)" | "BNS 103" | "BNS 105" | "BNS 303" | "BNS 309" | "BNS 318" | etc.,\n'
+            '  "primary_charge": "Canonical charge name",\n'
+            '  "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)" | "Tier 2: 3 to 7 Years (Arnesh Kumar Threshold / Medium Penalty)" | "Tier 3: 7 to 10 Years (Serious Offence / Substantial Imprisonment)" | "Tier 4: Life Imprisonment / Capital Sentence (Heinous Offence)",\n'
+            '  "confidence": 0.95,\n'
+            '  "judicial_ratio": "Comprehensive judicial ratio citing applicable legal principles and Supreme Court precedent."\n'
+            "}"
+        )
+
+        user_content = f"Case Facts:\n{fact_text}"
+
+        if self.gemini_key:
+            res = self._call_gemini(system_prompt, user_content)
+            if res:
+                return res
+
+        if self.groq_key:
+            res = self._call_groq(system_prompt, user_content)
+            if res:
+                return res
+
+        if self.openai_key:
+            res = self._call_openai(system_prompt, user_content)
+            if res:
+                return res
+
+        return None
+
+    def _clean_json_str(self, raw: str) -> str:
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
+        return cleaned.strip()
+
+    def _call_gemini(self, system_prompt: str, user_content: str) -> Optional[Dict[str, Any]]:
+        models = [
+            "gemini-3.1-flash-lite",
+            "gemini-3-flash-preview",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
+        ]
+        for m in models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={self.gemini_key}"
+            payload = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [
+                            {"text": f"{system_prompt}\n\n{user_content}"}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "response_mime_type": "application/json",
+                    "temperature": 0.1
+                }
+            }
+            try:
+                data = json.dumps(payload).encode("utf-8")
+                req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=12) as response:
+                    raw_text = response.read().decode("utf-8")
+                    resp_json = json.loads(raw_text)
+                    cands = resp_json.get("candidates", [])
+                    if cands and "content" in cands[0] and "parts" in cands[0]["content"]:
+                        text_val = cands[0]["content"]["parts"][0].get("text", "")
+                        clean_str = self._clean_json_str(text_val)
+                        parsed = json.loads(clean_str)
+                        parsed["engine"] = f"Pretrained Cloud LLM (Google {m} Zero-Shot API)"
+                        return parsed
+            except Exception as e:
+                logger.info(f"[Universal API] Gemini ({m}) notice: {e}")
+        return None
+
+    def _call_groq(self, system_prompt: str, user_content: str) -> Optional[Dict[str, Any]]:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1
+        }
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.groq_key}"
+            }
+            req = urllib.request.Request(url, data=data, headers=headers)
+            with urllib.request.urlopen(req, timeout=12) as response:
+                raw_text = response.read().decode("utf-8")
+                resp_json = json.loads(raw_text)
+                choices = resp_json.get("choices", [])
+                if choices and "message" in choices[0]:
+                    content_str = choices[0]["message"].get("content", "")
+                    clean_str = self._clean_json_str(content_str)
+                    parsed = json.loads(clean_str)
+                    parsed["engine"] = "Pretrained Cloud LLM (Groq Llama-3.3-70b Zero-Shot API)"
+                    return parsed
+        except Exception as e:
+            logger.info(f"[Universal API] Groq notice: {e}")
+        return None
+
+    def _call_openai(self, system_prompt: str, user_content: str) -> Optional[Dict[str, Any]]:
+        url = "https://api.openai.com/v1/chat/completions"
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1
+        }
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.openai_key}"
+            }
+            req = urllib.request.Request(url, data=data, headers=headers)
+            with urllib.request.urlopen(req, timeout=12) as response:
+                raw_text = response.read().decode("utf-8")
+                resp_json = json.loads(raw_text)
+                choices = resp_json.get("choices", [])
+                if choices and "message" in choices[0]:
+                    content_str = choices[0]["message"].get("content", "")
+                    clean_str = self._clean_json_str(content_str)
+                    parsed = json.loads(clean_str)
+                    parsed["engine"] = "Pretrained Cloud LLM (OpenAI GPT-4o-mini Zero-Shot API)"
+                    return parsed
+        except Exception as e:
+            logger.info(f"[Universal API] OpenAI notice: {e}")
+        return None
+
+
+def get_active_llm_status() -> Tuple[str, bool]:
+    gem_key = os.environ.get("GEMINI_API_KEY", "").strip() or EMBEDDED_GEMINI_API_KEY.strip()
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip() or EMBEDDED_GROQ_API_KEY.strip()
+    oai_key = os.environ.get("OPENAI_API_KEY", "").strip() or EMBEDDED_OPENAI_API_KEY.strip()
+    # 1. Colab Secrets resolution
+    if not (gem_key or groq_key or oai_key):
+        try:
+            from google.colab import userdata
+            gem_key = userdata.get("GEMINI_API_KEY") or ""
+            groq_key = userdata.get("GROQ_API_KEY") or ""
+        except Exception:
+            pass
+
+    # 2. Multi-path .env resolution
+    if not (gem_key or groq_key or oai_key):
+        candidate_envs = [
+            Path(__file__).resolve().parent / ".env" if "__file__" in globals() else Path(".env"),
+            Path(".env"),
+            Path("/content/.env")
+        ]
+        for env_path in candidate_envs:
+            if env_path.exists():
+                try:
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line_str = line.strip()
+                            if line_str.startswith("GEMINI_API_KEY=") and not gem_key:
+                                gem_key = line_str.split("=", 1)[1].strip().strip('"').strip("'")
+                            elif line_str.startswith("GROQ_API_KEY=") and not groq_key:
+                                groq_key = line_str.split("=", 1)[1].strip().strip('"').strip("'")
+                            elif line_str.startswith("OPENAI_API_KEY=") and not oai_key:
+                                oai_key = line_str.split("=", 1)[1].strip().strip('"').strip("'")
+                except Exception:
+                    pass
+            if gem_key or groq_key or oai_key:
+                break
+
+    if gem_key:
+        return "Semantic LLM Engine Active: Google Gemini (gemini-3.1-flash-lite Zero-Shot API)", True
+    elif groq_key:
+        return "Semantic LLM Engine Active: Groq Llama-3.3-70b Zero-Shot API", True
+    elif oai_key:
+        return "Semantic LLM Engine Active: OpenAI GPT-4o-mini Zero-Shot API", True
+    else:
+        return "Reasoner: Deterministic Statutory Prober (Set GEMINI_API_KEY or GROQ_API_KEY for Cloud LLM)", False
+
+
 class PretrainedLegalReasoner:
     """
-    Dual-Mode Pretrained Legal Reasoner:
-    Mode 1: 4-Bit Neural LLM on GPU (Qwen2.5-7B-Instruct)
-    Mode 2: Dense Semantic Prober on CPU (Deterministic & Fast)
+    Tri-Engine Pretrained Legal Reasoner:
+    Engine 1: Universal Zero-Shot Cloud LLM (Gemini, Groq, OpenAI via urllib REST)
+    Engine 2: 4-Bit Neural LLM on GPU (Qwen2.5-7B-Instruct with bitsandbytes)
+    Engine 3: Dense Semantic Prober on CPU (Deterministic & Fast Fallback)
     """
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-7B-Instruct", device: Optional[str] = None):
+    def __init__(self, model_name: Optional[str] = None, device: Optional[str] = None):
+        if model_name is None:
+            model_name = os.environ.get("DLKR_REASONER_MODEL", "Qwen/Qwen2.5-3B-Instruct")
         self.model_name = model_name
         self.device = device
         self.is_loaded = False
         self.pipeline = None
+        self.api_client = UniversalLegalApiClient()
 
     def load_model(self):
         try:
             import torch
             if not torch.cuda.is_available():
-                logger.info("[Reasoner] No CUDA GPU detected. Active in Dense Semantic Prober mode.")
+                logger.info("[Reasoner] No CUDA GPU detected. Active in Deterministic Rule Engine mode.")
                 return
 
             from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, BitsAndBytesConfig
@@ -1607,8 +1997,108 @@ class PretrainedLegalReasoner:
             self.is_loaded = True
             logger.info(f"[Reasoner] Successfully loaded {self.model_name} in 4-bit on GPU.")
         except Exception as e:
-            logger.info(f"[Reasoner Notice] Neural weights deferred ({e}). High-speed Dense Semantic Prober active.")
+            logger.info(f"[Reasoner Notice] Neural weights deferred ({e}). High-speed Deterministic Rule Engine active.")
             self.is_loaded = False
+
+    def _sync_facts_from_llm(self, facts: AtomicCaseFacts, parsed: Dict[str, Any]) -> AtomicCaseFacts:
+        if "is_out_of_domain" in parsed:
+            facts.is_out_of_domain = bool(parsed["is_out_of_domain"])
+        if "is_purely_civil" in parsed:
+            facts.is_purely_civil = bool(parsed["is_purely_civil"])
+
+        # Weapon extraction and categorization
+        if "weapon_used" in parsed:
+            w = parsed["weapon_used"]
+            if w and str(w).lower() not in ("none", "null", "false", ""):
+                facts.weapon_used = str(w)
+                w_lower = str(w).lower()
+                if any(k in w_lower for k in ["knife", "dagger", "sword", "blade", "axe", "sickle", "machete"]):
+                    facts.weapon_category = "Sharp/Cutting (Knife/Dagger)"
+                elif any(k in w_lower for k in ["gun", "pistol", "revolver", "rifle", "firearm", "shotgun"]):
+                    facts.weapon_category = "Firearm/Lethal"
+                elif any(k in w_lower for k in ["poison", "cyanide", "arsenic", "insecticide"]):
+                    facts.weapon_category = "Poison / Chemical Lethal"
+                else:
+                    facts.weapon_category = "Blunt Heavy (Iron Rod/Lathi)"
+            else:
+                facts.weapon_used = None
+                facts.weapon_category = "Unarmed"
+                facts.weapon_source = "Unarmed"
+
+        if "weapon_category" in parsed and parsed["weapon_category"] in [
+            "Firearm/Lethal", "Sharp/Cutting (Knife/Dagger)", "Blunt Heavy (Iron Rod/Lathi)", "Poison / Chemical Lethal", "Unarmed"
+        ]:
+            facts.weapon_category = parsed["weapon_category"]
+
+        # Injury severity
+        if "injury_severity" in parsed:
+            inj = str(parsed["injury_severity"]).strip()
+            if any(k in inj.lower() for k in ["fatal", "death", "killed"]):
+                facts.injury_severity = "Fatal (Death)"
+            elif any(k in inj.lower() for k in ["grievous", "fracture", "vital"]):
+                facts.injury_severity = "Grievous (Fracture/Vital)"
+            elif any(k in inj.lower() for k in ["simple", "hurt", "minor"]):
+                facts.injury_severity = "Simple Hurt"
+            elif any(k in inj.lower() for k in ["surviv", "non-fatal"]):
+                facts.injury_severity = "Surviving / Non-Fatal"
+            elif inj.lower() in ("none", "null"):
+                facts.injury_severity = "None"
+
+        # Mens rea and mental elements
+        if "has_premeditation" in parsed:
+            facts.has_premeditation = bool(parsed["has_premeditation"])
+        if "is_sudden_fight" in parsed:
+            facts.is_sudden_fight = bool(parsed["is_sudden_fight"])
+        if "is_heat_of_passion" in parsed:
+            facts.is_heat_of_passion = bool(parsed["is_heat_of_passion"])
+        if "single_blow" in parsed:
+            facts.single_blow = bool(parsed["single_blow"])
+
+        # Specific penal types
+        if "is_rash_driving" in parsed:
+            facts.is_rash_driving = bool(parsed["is_rash_driving"])
+        primary_art = str(parsed.get("primary_article_ipc", "")).upper()
+        primary_bns = str(parsed.get("primary_article_bns", "")).upper()
+        if "304A" in primary_art or "106" in primary_bns:
+            facts.is_rash_driving = True
+            if "Rash or Negligent Act (s.304A IPC / s.106 BNS)" not in facts.mitigating_defenses:
+                facts.mitigating_defenses.append("Rash or Negligent Act (s.304A IPC / s.106 BNS)")
+        if "is_dowry_death" in parsed:
+            facts.is_dowry_death = bool(parsed["is_dowry_death"])
+        if "is_theft" in parsed:
+            facts.is_theft = bool(parsed["is_theft"])
+        if "is_robbery" in parsed:
+            facts.is_robbery = bool(parsed["is_robbery"])
+        if "is_breach_of_trust" in parsed:
+            facts.is_breach_of_trust = bool(parsed["is_breach_of_trust"])
+        if "is_cheating" in parsed:
+            facts.is_cheating = bool(parsed["is_cheating"])
+        if "has_forged_documents" in parsed:
+            facts.has_forged_documents = bool(parsed["has_forged_documents"])
+        if "is_valuable_security" in parsed:
+            facts.is_valuable_security = bool(parsed["is_valuable_security"])
+        if "is_sexual_offence" in parsed:
+            facts.is_sexual_offence = bool(parsed["is_sexual_offence"])
+        if "sexual_offence_negated" in parsed:
+            facts.sexual_offence_negated = bool(parsed["sexual_offence_negated"])
+        if "is_matrimonial_cruelty" in parsed:
+            facts.is_matrimonial_cruelty = bool(parsed["is_matrimonial_cruelty"])
+        if "multiple_accused" in parsed:
+            facts.multiple_accused = bool(parsed["multiple_accused"])
+        if "is_conspiracy" in parsed:
+            facts.is_conspiracy = bool(parsed["is_conspiracy"])
+        if "threat_to_cause_death" in parsed:
+            facts.threat_to_cause_death = bool(parsed["threat_to_cause_death"])
+
+        # Temporal elements
+        if "incident_date" in parsed and parsed["incident_date"]:
+            facts.incident_date = str(parsed["incident_date"])
+        if "incident_regime" in parsed and parsed["incident_regime"] in ("IPC_1860", "BNS_2023"):
+            facts.incident_regime = parsed["incident_regime"]
+        if "is_date_uncertain" in parsed:
+            facts.incident_date_uncertain = bool(parsed["is_date_uncertain"])
+
+        return facts
 
     def comprehend_and_reason(self, fact_text: str, fallback_extractor: Optional[AtomicLegalFactExtractor] = None) -> Tuple[AtomicCaseFacts, Dict[str, Any]]:
         if fallback_extractor:
@@ -1616,6 +2106,18 @@ class PretrainedLegalReasoner:
         else:
             facts = AtomicLegalFactExtractor().extract(fact_text)
 
+        # 1. First priority: Universal Zero-Shot Cloud LLM API (if configured via env key)
+        if self.api_client.is_available():
+            try:
+                parsed = self.api_client.reason(fact_text)
+                if parsed:
+                    facts = self._sync_facts_from_llm(facts, parsed)
+                    parsed["ratio_decidendi"] = parsed.get("judicial_ratio", "")
+                    return facts, parsed
+            except Exception as e:
+                logger.info(f"[Universal API] Falling back to local engine: {e}")
+
+        # 2. Second priority: Local 4-bit Neural LLM on GPU (if loaded)
         if self.is_loaded and self.pipeline:
             try:
                 system_prompt = (
@@ -1644,49 +2146,17 @@ class PretrainedLegalReasoner:
                 if "<|im_start|>assistant" in raw_gen:
                     raw_gen = raw_gen.split("<|im_start|>assistant")[-1].strip()
 
-                # Extract JSON using greedy match
                 json_match = re.search(r"\{[\s\S]*\}", raw_gen)
                 if json_match:
                     parsed = json.loads(json_match.group(0))
                     parsed["engine"] = f"Pretrained Neural LLM ({self.model_name} 4-Bit GPU)"
                     parsed["ratio_decidendi"] = parsed.get("judicial_ratio", "")
-
-                    # Synchronize all verified legal facts from Neural LLM
-                    if "weapon_used" in parsed:
-                        w = parsed["weapon_used"]
-                        if w and str(w).lower() not in ("none", "null", "false", ""):
-                            facts.weapon_used = str(w)
-                            if any(k in str(w).lower() for k in ["knife", "dagger", "sword", "blade", "axe"]):
-                                facts.weapon_category = "Sharp/Cutting (Knife/Dagger)"
-                            elif any(k in str(w).lower() for k in ["gun", "pistol", "revolver", "rifle"]):
-                                facts.weapon_category = "Firearm/Lethal"
-                            else:
-                                facts.weapon_category = "Blunt Heavy (Iron Rod/Lathi)"
-                        else:
-                            facts.weapon_used = None
-                            facts.weapon_category = "Unarmed"
-                            facts.weapon_source = "Unarmed"
-
-                    if parsed.get("injury_severity") in ["Fatal (Death)", "Grievous (Fracture/Vital)", "Simple Hurt", "Surviving / Non-Fatal", "None"]:
-                        facts.injury_severity = parsed["injury_severity"]
-                    if parsed.get("is_theft") is True:
-                        facts.is_theft = True
-                    if parsed.get("is_robbery") is True:
-                        facts.is_robbery = True
-                    if parsed.get("is_sudden_fight") is True:
-                        facts.is_sudden_fight = True
-                    if parsed.get("has_premeditation") is True:
-                        facts.has_premeditation = True
-                    if parsed.get("is_purely_civil") is True:
-                        facts.is_purely_civil = True
-                    if parsed.get("is_sexual_offence") is True:
-                        facts.is_sexual_offence = True
-
+                    facts = self._sync_facts_from_llm(facts, parsed)
                     return facts, parsed
             except Exception as e:
                 logger.info(f"[Reasoner Notice] LLM fallback ({e}). Using deterministic legal prober.")
 
-        # Deterministic Legal Prober Mode (CPU)
+        # 3. Third priority: High-speed Deterministic Legal Prober Mode (CPU Fallback)
         parsed = self._prober_reason(fact_text, facts)
         parsed["ratio_decidendi"] = parsed.get("judicial_ratio", "")
         return facts, parsed
@@ -1706,7 +2176,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "No Penalty Attracted",
                 "confidence": 0.0,
                 "judicial_ratio": "Narrative does not disclose essential ingredients of any cognizable criminal offence under IPC or BNS. The system abstains from criminal adjudication.",
-                "engine": "Pretrained Legal Reasoner (Abstention Gate)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (Abstention Gate)"
             }
 
         # 1. Civil Dispute Quashing
@@ -1720,7 +2190,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
                 "confidence": 0.94,
                 "judicial_ratio": "Dispute arises from commercial contract or invoices without fraudulent intent at inception. The Supreme Court in State of Haryana v. Bhajan Lal and Hridaya Ranjan Prasad Verma mandates quashing where civil dispute is cloaked as criminal complaint.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 2. Rash and Negligent Driving Death
@@ -1734,7 +2204,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
                 "confidence": 0.92,
                 "judicial_ratio": "Death caused by vehicular collision without murderous intention falls under Section 304A IPC / Section 106(1) BNS (State of Karnataka v. Satish). Substantive murder sections are legally precluded.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 3. Rape / Sexual Offences
@@ -1748,7 +2218,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 4: Life Imprisonment / Capital Sentence (Heinous Offence)",
                 "confidence": 0.95,
                 "judicial_ratio": "Substantive elements of penetrative sexual assault without consent established under Section 376 IPC / Section 64 BNS.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 4. Dowry Death vs Matrimonial Cruelty
@@ -1762,7 +2232,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 3: 7 to 10 Years (Serious Offence / Substantial Imprisonment)",
                 "confidence": 0.94,
                 "judicial_ratio": "Unnatural death occurring strictly within 7 years of marriage preceded by cruelty in connection with dowry demands attracts Section 304B IPC (Satbir Singh v. State of Haryana).",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 5. Premeditated Murder
@@ -1776,7 +2246,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 4: Life Imprisonment / Capital Sentence (Heinous Offence)",
                 "confidence": 0.96,
                 "judicial_ratio": "Accused planned and executed an intentional killing with prior enmity and brought weapons. Fits Section 302 IPC / Section 103 BNS, carrying Tier 4 Life Imprisonment or Capital Sentence.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 6. Sudden Fight Culpable Homicide (Exception 4)
@@ -1790,7 +2260,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 3: 7 to 10 Years (Serious Offence / Substantial Imprisonment)",
                 "confidence": 0.95,
                 "judicial_ratio": "Committed in heat of passion upon a sudden quarrel without premeditation, satisfying all four ingredients of Section 300 Exception 4 (Ghapoo Yadav v. State of M.P.; Pulicherla Nagaraju). Charged under Section 304 Part II.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 7. Attempt to Murder
@@ -1804,7 +2274,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 3: 7 to 10 Years (Serious Offence / Substantial Imprisonment)",
                 "confidence": 0.94,
                 "judicial_ratio": "Act executed with lethal weapon directed at vital parts with intention to kill satisfies Section 307 IPC / Section 109 BNS (State of Maharashtra v. Balram Bama Patil).",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 8. Robbery
@@ -1818,7 +2288,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 3: 7 to 10 Years (Serious Offence / Substantial Imprisonment)",
                 "confidence": 0.95,
                 "judicial_ratio": "Theft aggravated by brandishing a weapon or threatening instant death constitutes Robbery under Section 390/392 IPC / Section 309(4) BNS.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 9. Forgery of Valuable Security (Will / Deed)
@@ -1832,7 +2302,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 4: Life Imprisonment / Capital Sentence (Heinous Offence)",
                 "confidence": 0.94,
                 "judicial_ratio": "Fabrication of valuable security or testamentary will constitutes an aggravated offence under Section 467 IPC / Section 338 BNS carrying up to life imprisonment.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 10. Forgery for Purpose of Cheating
@@ -1846,7 +2316,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 2: 3 to 7 Years (Arnesh Kumar Threshold / Medium Penalty)",
                 "confidence": 0.93,
                 "judicial_ratio": "Forging documents with intent to cheat satisfies Section 468 IPC / Section 336(3) BNS (Guru Bipin Singh v. Chongtham Manihar Singh).",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 11. Cheating & Financial Fraud
@@ -1860,7 +2330,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 2: 3 to 7 Years (Arnesh Kumar Threshold / Medium Penalty)",
                 "confidence": 0.93,
                 "judicial_ratio": "Deception from inception inducing delivery of property attracts Section 420 IPC / Section 318(4) BNS.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 12. Grievous Hurt with Weapon
@@ -1874,7 +2344,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 4: Life Imprisonment / Capital Sentence (Heinous Offence)",
                 "confidence": 0.92,
                 "judicial_ratio": "Dangerous weapon assault resulting in verified grievous injury falls under Section 326 IPC / Section 118(2) BNS.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 13. Simple Hurt with Weapon
@@ -1888,7 +2358,21 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
                 "confidence": 0.91,
                 "judicial_ratio": "Infliction of simple or superficial wound with dangerous weapon falls under Section 324 IPC / Section 118(1) BNS (Anwarul Haq v. State of U.P.).",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
+            }
+
+        # 13.5. Simple Hurt Unarmed (Slapping, Punches, Scuffle)
+        if atomic_facts.injury_severity in ["Simple Hurt", "Surviving / Non-Fatal"] and not atomic_facts.weapon_used:
+            return {
+                "actus_reus": "Voluntarily causing simple hurt without dangerous weapon (slaps, punches, minor scuffle).",
+                "mens_rea": "Intention or knowledge of causing simple bodily pain or hurt.",
+                "primary_article_ipc": "IPC 323",
+                "primary_article_bns": "BNS 115(2)",
+                "primary_charge": "Assault & Grievous Hurt",
+                "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
+                "confidence": 0.92,
+                "judicial_ratio": "Infliction of simple hurt without weapon brandishing or lethal instrument squarely falls under Section 323 IPC / Section 115(2) BNS. Section 324 is precluded due to absence of dangerous weapon.",
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 14. Matrimonial Cruelty
@@ -1902,7 +2386,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
                 "confidence": 0.92,
                 "judicial_ratio": "Allegations satisfy Section 498A IPC / Section 85 BNS cruelty essentials. Governed by procedural safeguards under Arnesh Kumar.",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 15. Simple Theft
@@ -1916,7 +2400,7 @@ class PretrainedLegalReasoner:
                 "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
                 "confidence": 0.94,
                 "judicial_ratio": "Accused took personal property without force, weapon brandishing, or intimidation, squarely under Section 379 IPC / Section 303(2) BNS (K.N. Mehra v. State of Rajasthan).",
-                "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+                "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
             }
 
         # 16. Fallback General
@@ -1929,7 +2413,7 @@ class PretrainedLegalReasoner:
             "penalty_tier": "Tier 1: Up to 3 Years (Minor / Summary Offence)",
             "confidence": 0.40,
             "judicial_ratio": "Narrative lacks specific established ingredients for primary penal provision. Formal police investigation and evidence collection required.",
-            "engine": "Pretrained Legal Reasoner (Dense Semantic Mode)"
+            "engine": "Deterministic Rule & Statutory Ingredient Engine (CPU Mode)"
         }
 
 
@@ -1948,7 +2432,10 @@ class DynamicLegalKnowledgeRetriever:
         self._init_vector_store()
 
     def _get_kb_hash(self) -> str:
-        s = "".join([f"{x['id']}:{x['title']}" for x in EXTERNAL_LEGAL_KNOWLEDGE_BASE])
+        s = "".join([
+            f"{x.get('id', '')}:{x.get('title', '')}:{x.get('charge', '')}:{x.get('penalty_tier', '')}:{','.join(x.get('essential_elements', []))}:{x.get('content', '')}"
+            for x in EXTERNAL_LEGAL_KNOWLEDGE_BASE
+        ])
         return hashlib.md5(s.encode("utf-8")).hexdigest()
 
     def _init_vector_store(self):
@@ -2035,6 +2522,8 @@ class DynamicLegalKnowledgeRetriever:
                 query_terms.append("forgery forged document false record")
             if atomic_facts.is_purely_civil:
                 query_terms.append("commercial contract dispute quashing")
+            if atomic_facts.is_rash_driving:
+                query_terms.append("rash negligent driving vehicular accident motor vehicle speed death")
 
         enriched_query = " ".join(query_terms)
 
@@ -2075,7 +2564,7 @@ class DynamicLegalKnowledgeRetriever:
         scored = []
 
         domain_stems = {
-            "cheat": ["cheat", "fraud", "deceive", "scam", "induce", "defraud", "fictitious", "promised", "vanished", "cash", "lakh"],
+            "cheat": ["cheat", "fraud", "deceive", "scam", "induce", "defraud", "fictitious"],
             "forge": ["forged", "forgery", "fake", "fabricate", "counterfeit", "valuable security", "deed", "signature", "will"],
             "murder": ["murder", "killed", "homicide", "fatal", "ambush", "gunshot", "axe", "grudge", "premeditated"],
             "culpable": ["culpable", "sudden quarrel", "sudden fight", "heat of passion", "single blow", "spontaneous", "provocation"],
@@ -2083,12 +2572,13 @@ class DynamicLegalKnowledgeRetriever:
             "hurt_weapon": ["sharp knife", "knife", "dagger", "blade", "laceration", "cutting", "stabbing", "dangerous weapon"],
             "hurt_simple": ["slapped", "slap", "bare fists", "fists", "bruises", "contusions", "simple hurt"],
             "theft": ["theft", "stole", "stolen", "movable property", "without consent", "pilfered", "pickpocket", "lifted", "pocket", "wallet"],
-            "robbery": ["robbery", "robbed", "knifepoint", "gunpoint", "held to throat", "extorted", "threat of instant death", "force", "brandished"],
+            "robbery": ["robbery", "robbed", "knifepoint", "gunpoint", "held to throat", "extorted", "threat of instant death", "force"],
             "breach": ["breach of trust", "entrusted", "misappropriation", "misappropriated", "fiduciary conversion"],
             "matrimonial": ["matrimonial cruelty", "cruelty by husband", "harassment for dowry", "in-laws", "domestic cruelty"],
             "dowry_death": ["dowry death", "burn injuries", "abnormal circumstances", "within seven years of marriage"],
             "sexual": ["rape", "sexual assault", "penetrative", "against her will"],
-            "intimidate": ["criminal intimidation", "threatened to kill", "death threat", "alarm", "terrorize"]
+            "intimidate": ["criminal intimidation", "threatened to kill", "death threat", "alarm", "terrorize"],
+            "rash_negligence": ["rash", "negligent", "negligence", "truck", "speeding", "driving", "scooterist", "traffic", "accident", "vehicular", "collision", "pedestrian", "signal", "school zone"]
         }
 
         fact_lower = query_text.lower()
@@ -2315,6 +2805,8 @@ class RelevanceAndConfidenceGate:
             return 0.15, "Lacks rash/negligent driving fatality."
 
         if "304_PART2" in code:
+            if facts.is_rash_driving:
+                return 0.05, "Precluded by rash/negligent driving (s.304A)."
             if facts.injury_severity == "Fatal (Death)":
                 if facts.is_heat_of_passion or facts.is_sudden_fight:
                     return 0.95, "Fulfills Section 300 Exception 4: sudden quarrel without premeditation."
@@ -2322,6 +2814,8 @@ class RelevanceAndConfidenceGate:
             return 0.10, "Non-fatal injury; homicide not satisfied."
 
         if "304_PART1" in code:
+            if facts.is_rash_driving:
+                return 0.05, "Precluded by rash/negligent driving (s.304A)."
             if facts.injury_severity == "Fatal (Death)":
                 if not facts.has_premeditation:
                     return 0.85, "Fatal injury likely to cause death without premeditated plan."
@@ -2329,6 +2823,8 @@ class RelevanceAndConfidenceGate:
             return 0.10, "Requires causation of death."
 
         if "302" in code and "304" not in code:
+            if facts.is_rash_driving:
+                return 0.05, "Precluded by rash/negligent driving (s.304A)."
             if facts.injury_severity != "Fatal (Death)":
                 return 0.05, "Victim survived; murder requires death."
             if facts.is_heat_of_passion or facts.is_sudden_fight:
@@ -2433,7 +2929,7 @@ class RelevanceAndConfidenceGate:
 # 6. PREFIX KNOWLEDGE FUSION LAYER (PFL)
 # ============================================================
 class PrefixKnowledgeFusion:
-    def __init__(self, max_prefix_length: int = 256, max_fact_length: int = 900):
+    def __init__(self, max_prefix_length: int = 256, max_fact_length: int = 3500):
         self.max_prefix_length = max_prefix_length
         self.max_fact_length = max_fact_length
 
@@ -2493,9 +2989,52 @@ class PrefixKnowledgeFusion:
 # ============================================================
 # 7. MULTI-HEAD PREDICTION NETWORK (MHPN)
 # ============================================================
+class MultiTaskLegalHead(nn.Module if HAS_TORCH else object):
+    """
+    Trained Multi-Task Neural Classification Head on top of InLegalBERT (768-dim [CLS]).
+    Jointly projects into:
+      - Head 1: Law Articles (Calibrated Multi-Label Softmax/Sigmoid)
+      - Head 2: Criminal Charges (Calibrated Multi-Label Softmax/Sigmoid)
+      - Head 3: Penalty Severity Tiers (Ordinal Softmax)
+    Eliminates raw BERT representation collapse (anisotropy) and surface lexical matching bias.
+    """
+    def __init__(self, hidden_size: int = 768, num_articles: int = 18, num_charges: int = 14, num_tiers: int = 4):
+        if not HAS_TORCH:
+            return
+        super().__init__()
+        self.dropout = nn.Dropout(0.2)
+        self.article_head = nn.Sequential(
+            nn.Linear(hidden_size, 256),
+            nn.GELU(),
+            nn.Dropout(0.15),
+            nn.Linear(256, num_articles)
+        )
+        self.charge_head = nn.Sequential(
+            nn.Linear(hidden_size, 256),
+            nn.GELU(),
+            nn.Dropout(0.15),
+            nn.Linear(256, num_charges)
+        )
+        self.tier_head = nn.Sequential(
+            nn.Linear(hidden_size, 128),
+            nn.GELU(),
+            nn.Dropout(0.15),
+            nn.Linear(128, num_tiers)
+        )
+
+    def forward(self, cls_rep):
+        cls_drop = self.dropout(cls_rep)
+        return (
+            self.article_head(cls_drop),
+            self.charge_head(cls_drop),
+            self.tier_head(cls_drop)
+        )
+
+
 class MultiTaskLegalPredictor:
     """
     Multi-Head Prediction Network (MHPN) combining:
+    - Trained InLegalBERT Multi-Task Neural Classification Heads
     - Factual Statutory Ingredients Match
     - Gated Legal Knowledge Evidence
     - Pretrained Legal Reasoner Judicial Distillation
@@ -2506,10 +3045,474 @@ class MultiTaskLegalPredictor:
         self.device = device
         self.tokenizer = None
         self.backbone = None
+        self.head: Optional[MultiTaskLegalHead] = None
+        self.has_neural_head = False
         self.is_loaded = False
         self.article_embeddings = {}
         self.charge_embeddings = {}
         self.extractor = AtomicLegalFactExtractor()
+
+    def _get_head_weights_candidates(self) -> List[Path]:
+        return [
+            PERSIST_DIR / HEAD_WEIGHTS_FILENAME,
+            BASE_DIR / HEAD_WEIGHTS_FILENAME,
+            Path("/content") / HEAD_WEIGHTS_FILENAME,
+            Path("/content/drive/MyDrive/DLKR_LJP_Indian_Law") / HEAD_WEIGHTS_FILENAME,
+            Path(__file__).resolve().parent / HEAD_WEIGHTS_FILENAME
+        ]
+
+    def _init_or_load_head(self, torch):
+        if not HAS_TORCH or self.backbone is None:
+            return
+
+        num_articles = len(config.LAW_ARTICLES)
+        num_charges = len(config.CRIMINAL_CHARGES)
+        num_tiers = len(config.PENALTY_TIERS)
+        hidden_dim = getattr(self.backbone.config, "hidden_size", 768)
+
+        self.head = MultiTaskLegalHead(
+            hidden_size=hidden_dim,
+            num_articles=num_articles,
+            num_charges=num_charges,
+            num_tiers=num_tiers
+        ).to(self.device)
+
+        # 1. Search for existing pre-trained head weights
+        found_path = None
+        for p in self._get_head_weights_candidates():
+            if p.exists() and p.is_file():
+                found_path = p
+                break
+
+        if found_path:
+            try:
+                try:
+                    state_dict = torch.load(found_path, map_location=self.device, weights_only=True)
+                except TypeError:
+                    state_dict = torch.load(found_path, map_location=self.device)
+                self.head.load_state_dict(state_dict)
+                self.head.eval()
+                self.has_neural_head = True
+                logger.info(f"[MHPN] ✅ Loaded trained neural classification head weights from: {found_path}")
+                return
+            except Exception as e:
+                logger.warning(f"[MHPN] Could not load candidate head weights at {found_path} ({e}).")
+
+        # 2. If no weights found and on CUDA/Colab, auto-calibrate and train head weights
+        if torch.cuda.is_available() or getattr(config, "IS_COLAB", False):
+            logger.info("[MHPN] Head weights not cached. Initiating automatic InLegalBERT multi-task training on 240+ legal scenarios...")
+            self.train_and_save_head(save_path=PERSIST_DIR / HEAD_WEIGHTS_FILENAME, epochs=8)
+
+    def _generate_augmented_training_corpus(self, articles_list: List[str], charges_list: List[str]) -> List[Dict[str, Any]]:
+        """
+        Synthesizes 240+ rich, realistic Indian criminal case scenarios across all statutory sections.
+        Covers diverse fact permutations: dowry death with cruelty, sudden brawl single blows,
+        premeditated poisonings, knife holdups, forged bank loans, rash driving, and civil quashing.
+        """
+        samples: List[Dict[str, Any]] = []
+
+        def add_s(text: str, arts: List[str], chgs: List[str], tier: int):
+            samples.append({
+                "text": text,
+                "art_codes": [a for a in arts if a in articles_list],
+                "chg_names": [c for c in chgs if c in charges_list],
+                "tier_idx": max(0, min(3, tier))
+            })
+
+        # 1. Statutory Registry Grounding (Canonical Definitions & Precedents)
+        for art_code in articles_list:
+            info = STATUTES_REGISTRY.get(art_code, {})
+            chg = info.get("charge", "")
+            t_ord = TIER_LEVEL_ORDINAL.get(info.get("default_tier", ""), 2) - 1
+            el_str = ", ".join(info.get("essential_elements", []))
+            add_s(f"{info.get('title', '')}. {info.get('content', '')} Essential statutory elements: {el_str}", [art_code], [chg], t_ord)
+            for prec in info.get("precedents", []):
+                add_s(f"Landmark Precedent {prec.get('title', '')}: {prec.get('content', '')} Ratio: {', '.join(prec.get('essential_elements', []))}", [art_code], [chg], t_ord)
+
+        # 2. Dowry Death (IPC 304B + IPC 498A Multi-Label) - 16 Augmented Scenarios
+        dowry_scenarios = [
+            "Deceased married 3 years ago was found dead due to chemical pesticide poisoning in matrimonial bedroom after husband and mother-in-law subjected her to continuous torture demanding gold ornaments and cash.",
+            "Bride married 18 months prior suffered fatal 90% burn injuries in kitchen following repeated physical assaults and cruelty by husband demanding Rs. 5 Lakhs dowry.",
+            "Victim married 4 years ago died under abnormal circumstances of chemical poisoning in matrimonial home following continuous cruelty by in-laws demanding a luxury vehicle as dowry.",
+            "Deceased died within 2 years of marriage from acute organophosphate poisoning in matrimonial home preceded by sustained domestic harassment demanding ancestral land share.",
+            "Newlywed woman found dead under suspicious circumstances with bodily bruises and poison traces within 3 years of marriage following relentless demands for cash dowry.",
+            "Wife died of fatal chemical ingestion within 5 years of marriage following persistent physical cruelty and starvation over unpaid dowry balance.",
+            "Deceased married 14 months ago was harassed for diamond jewelry and car by husband and parents-in-law, succumbed to unexplained poison in husband's residence.",
+            "Bride died of abnormal kitchen fire burns within 1 year of marriage after continuous domestic torture by husband and in-laws demanding dowry.",
+            "Deceased married 6 years ago subjected to regular bodily assault over unpaid dowry, died under unnatural conditions of poisoning in matrimonial home.",
+            "Young woman married 2 years ago died of acute poisoning in husband's custody following repeated dowry disputes and domestic violence.",
+            "Victim married 3 years prior died of toxic substance ingestion in matrimonial home after sustained harassment demanding gold ornaments and cash plot.",
+            "Deceased married 2.5 years ago died of unexplained poisoning following repeated demands for monetary dowry by husband and his relatives.",
+            "Newly married woman died of abnormal burns within 3 years of marriage; neighbor testified to daily dowry harassment and cruelty by husband.",
+            "Young bride found hanging with contusions in matrimonial house within 2 years of marriage following physical beatings demanding motorcycle dowry.",
+            "Deceased married 4 years prior died of chemical poisoning in matrimonial house; diary revealed continuous harassment and cruelty demanding cash dowry.",
+            "Victim married 1 year ago was subjected to cruelty by in-laws demanding flat registration, died of unnatural chemical poisoning in matrimonial home."
+        ]
+        for t in dowry_scenarios:
+            add_s(t, ["IPC_304B_BNS_80", "IPC_498A_BNS_85"], ["Dowry Death", "Matrimonial Cruelty & Harassment"], 2)
+
+        # 3. Premeditated Murder (IPC 302) - 16 Augmented Scenarios
+        murder_scenarios = [
+            "Accused plotted cold-blooded revenge over property feud, purchased illegal firearm, ambushed victim on dark road and shot point-blank into chest killing him instantly.",
+            "Accused laced victim's milk with lethal cyanide with deliberate premeditation to usurp ancestral inheritance, causing immediate fatal collapse.",
+            "Accused concealed sharp dagger, waited outside victim's office, and repeatedly hacked victim across throat and chest with premeditated intent to murder.",
+            "Contract killer hired by rival shot victim twice in head outside residential building, executing planned assassination with premeditated malice.",
+            "Accused tied victim's hands while sleeping and deliberately strangled him with nylon rope until death with calculated premeditation.",
+            "Accused followed business partner to lonely farm, struck multiple fatal blows on head with axe, and buried corpse to hide deliberate murder.",
+            "Accused armed with lethal country pistol ambushed political opponent near canal and shot him repeatedly with premeditated homicidal intention.",
+            "Accused administered fatal dose of arsenic poison over two weeks with calculated design to murder spouse for insurance policy.",
+            "Accused purchased sharp hunting knife three days prior, entered victim's home at night, and slit his throat with cold-blooded intention.",
+            "Accused cornered victim in deserted godown, poured petrol and set him ablaze with deliberate premeditated intention to murder.",
+            "Accused lay in wait behind trees with loaded double-barrel gun, shot deceased through heart upon arrival with premeditated malice.",
+            "Accused conspired with associates, abducted victim to remote warehouse, and deliberately inflicted fatal injuries with iron crowbar.",
+            "Accused struck sleeping victim on skull with heavy grinding stone with deliberate premeditation over illicit relationship jealousy.",
+            "Accused pushed victim into deep gorge after inviting him for trek with premeditated intention to eliminate sole witness.",
+            "Accused stabbed business competitor twenty times in chest with switchblade knife in planned ambush with clear murderous intent.",
+            "Accused injected victim with lethal veterinary drug while unconscious to cause fatal cardiac arrest and inherit property."
+        ]
+        for t in murder_scenarios:
+            add_s(t, ["IPC_302_BNS_103"], ["Murder & Culpable Homicide"], 3)
+
+        # 4. Culpable Homicide Part II (Sudden Fight / Exception 4 / Single Blow) - 16 Scenarios
+        sudden_scenarios = [
+            "A contractor argued with labourer over unpaid daily wages, exchange of abuses, contractor picked up iron rod lying nearby and struck single blow on head in heat of passion.",
+            "Sudden fight broke out in roadside tea stall over tea payment, accused grabbed soda bottle from counter and struck single blow on head without premeditation.",
+            "Argument erupted between neighbours over parked scooter, accused in sudden anger picked up stone from road and hit victim once on head causing fatal injury.",
+            "Two passengers quarreled over seat in crowded bus, pushed each other, accused delivered single fist blow causing victim to hit pavement and die.",
+            "Sudden dispute during village cricket match, accused spontaneously swung cricket bat hitting batsman once on temple in heat of passion.",
+            "Verbal spat between drunk patrons in restaurant escalated into scuffle, accused hit victim once with glass tumbler causing fatal hemorrhage.",
+            "Accused and deceased engaged in sudden quarrel in marketplace, accused picked up piece of firewood from shop and struck single fatal blow.",
+            "Traffic collision led to heated exchange, accused in spur of moment picked up brick from footpath and struck victim once without intent to kill.",
+            "Labourers argued over queue at water pump, accused shoved victim who fell on concrete curb suffering fatal cranial injury.",
+            "Spontaneous brawl at festival, accused picked up bamboo pole lying nearby and hit victim once across skull without premeditated design.",
+            "Minor argument over card game turned violent, accused struck single blow with wooden bench leg in sudden altercation.",
+            "Dispute over bill payment at grocery store, accused in sudden temper grabbed heavy weighing scale weight and struck victim once.",
+            "Sudden quarrel erupted over agricultural boundary furrow, accused snatched stick from bystander and struck single blow causing death.",
+            "Altercation between rickshaw drivers over passenger, accused hit victim once with iron tyre lever in heat of passion without premeditation.",
+            "Sudden argument between college students in canteen, accused struck victim with steel water flask causing fatal cerebral contusion.",
+            "Quarrel erupted during wedding feast over food serving, accused delivered spontaneous blow with wooden log without prior animosity."
+        ]
+        for t in sudden_scenarios:
+            add_s(t, ["IPC_304_PART2_BNS_105"], ["Culpable Homicide (Sudden Fight / Heat of Passion)"], 2)
+
+        # 5. Culpable Homicide Part I (Provocation / Private Defence Excess) - 14 Scenarios
+        part1_scenarios = [
+            "Upon catching trespasser in bedroom attempting assault, accused suffered grave and sudden provocation, lost control, and struck fatal blow with heavy stick.",
+            "Accused acting in excess of right of private defence during violent land dispute struck attacker fatally with spade without cold-blooded premeditation.",
+            "Heated dispute between brothers over agricultural water, deceased struck first with lathi, accused retaliated with sickle causing fatal injury without premeditation.",
+            "Victim hurled extreme abusive insults regarding accused's mother, accused lost self-control in sudden provocation and dealt fatal blow with cane.",
+            "Accused confronted armed burglar inside home, in heat of struggle exceeded self-defence and inflicted fatal head trauma.",
+            "Violent altercation over cattle grazing, accused struck deceased in high emotional agitation without cold-blooded premeditation causing death.",
+            "Deceased attacked accused with iron rod, accused disarmed him and in panic struck fatal counter-blow exceeding necessary defence.",
+            "Accused reacted to grave physical provocation by deceased, striking fatal blow in frenzy without prior enmity or planning.",
+            "During boundary wall dispute deceased assaulted accused's father, accused reacted in emotional rage striking deceased fatally with club.",
+            "Sudden mutual combat where deceased drew knife, accused retaliated with wooden plank causing fatal skull fracture in heat of moment.",
+            "Accused saw deceased attempting to molest his sister, under violent provocation struck deceased fatally with agricultural implement.",
+            "Farmer defending his crop from violent mob exceeded legitimate defence and fired single shot resulting in death of rioter.",
+            "Father attacked by aggressive intoxicated son disarmed him and struck fatal blow in sudden fear and desperation.",
+            "Accused subjected to severe physical thrashing by deceased reacted instantaneously striking fatal blow with nearby hammer."
+        ]
+        for t in part1_scenarios:
+            add_s(t, ["IPC_304_PART1_BNS_105"], ["Murder & Culpable Homicide"], 2)
+
+        # 6. Death by Negligence (IPC 304A) - 14 Scenarios
+        negligence_scenarios = [
+            "Truck driver driving at 85 km/h jumped red light in school zone, fatally ramming into scooterist without any intention or knowledge of homicide.",
+            "High-speed private bus overtaking recklessly on blind curve collided with oncoming motorcycle causing instant death of rider.",
+            "Building contractor failed to erect safety nets on 9th floor, dropped concrete beam fatally crushing pedestrian on public sidewalk.",
+            "Driver operating luxury sedan while texting on mobile phone lost control on highway and crashed into roadside tea stall killing customer.",
+            "Electrician left live high-voltage cables exposed in waterlogged public street without insulation, causing fatal shock to passerby.",
+            "Driver speeding in heavy rain with bald tires skidded across divider and collided with auto-rickshaw causing fatal injury to commuter.",
+            "Factory manager operated unserviced boiler without pressure relief valve despite warnings, resulting in boiler explosion killing worker.",
+            "Doctor administered wrong chemotherapy drug at ten times dosage due to gross administrative negligence causing patient death.",
+            "Bus driver reversed vehicle rapidly into depot bay without looking in mirrors, crushing conductor standing behind.",
+            "Speeding dumper truck drove on wrong side of highway at night with headlights off, colliding with car and killing driver.",
+            "Craneman operated heavy crane recklessly in windy conditions causing crane collapse on adjacent slum dwelling causing death.",
+            "Car driver driving rashly under influence of exhaustion fell asleep at wheel and rammed into pedestrians on pavement.",
+            "Contractor excavated deep trench across unlit public road without barricades or warning lights, causing motorcyclist to fall and die.",
+            "Amusement park operator ran roller coaster with worn safety harness causing passenger to fall to death due to gross negligence."
+        ]
+        for t in negligence_scenarios:
+            add_s(t, ["IPC_304A_BNS_106"], ["Rash and Negligent Act Causing Death"], 0)
+
+        # 7. Attempt to Murder (IPC 307) - 14 Scenarios
+        attempt_scenarios = [
+            "Accused attacked victim with meat cleaver aiming directly for neck shouting intent to kill; victim survived due to emergency vascular surgery.",
+            "Accused fired pistol at victim's head from three feet distance; bullet passed through cheek and victim survived after intensive hospitalization.",
+            "Accused stabbed victim in chest twice penetrating lung tissue; victim survived after emergency thoracotomy in critical care unit.",
+            "Accused waited in dark alley and attacked shopkeeper with iron rod repeatedly striking head until police siren frightened him away.",
+            "Accused threw victim from third floor balcony with intention to kill; victim suffered multiple fractures and survived.",
+            "Accused slashed victim's carotid artery with razor blade during ambush; victim survived due to prompt first aid and emergency surgery.",
+            "Accused drove pickup truck directly at traffic policeman standing at barricade to run him over; officer leaped aside and sustained grievous fractures.",
+            "Accused administered poison in victim's soup with intent to murder; victim was rushed to hospital and survived after stomach pump.",
+            "Accused fired multiple rounds from revolver into victim's car windshield; victim suffered shoulder bullet wounds and survived.",
+            "Accused struck victim on skull with sword shouting he would not leave him alive; victim survived with permanent cranial disability.",
+            "Accused cornered rival and fired shotgun at close range; victim suffered severe torso pellet wounds and survived in trauma center.",
+            "Accused slit victim's throat with paper cutter during robbery attempt; victim survived after 8-hour microsurgery.",
+            "Accused poured kerosene on sleeping victim and threw lit match with murderous intent; neighbors extinguished flames saving victim with burns.",
+            "Accused stabbed political leader three times in abdomen shouting death threats; victim survived emergency intestinal repair."
+        ]
+        for t in attempt_scenarios:
+            add_s(t, ["IPC_307_BNS_109"], ["Attempt to Murder"], 2)
+
+        # 8. Robbery & Extortion (IPC 392) - 14 Scenarios
+        robbery_scenarios = [
+            "Accused cornered commuter on dark street, held sharp knife to his throat, and forcibly extorted smartphone, gold ring, and cash under threat of instant death.",
+            "Three armed men entered jewellery shop brandishing country pistols, held staff hostage, and looted gold ornaments worth Rs. 40 Lakhs.",
+            "Accused accosted pedestrian near ATM booth at knife point, demanded wallet and PIN, threatening to stab him if he raised alarm.",
+            "Masked assailants intercepted delivery van on highway, beat driver with iron rods, and forcibly looted consignment boxes.",
+            "Accused pushed woman off scooter on deserted road, brandished dagger, and forcibly snatched gold chain and handbag.",
+            "Armed robbers boarded night train coach, threatened passengers with knives and country-made pistols, and looted cash and luggage.",
+            "Accused forced entry into elderly couple's residence at night, tied them up at knifepoint, and ransacked cupboards stealing cash.",
+            "Accused stopped motorcyclist on rural road, placed pistol against his forehead, and forcibly took away motorcycle and wallet.",
+            "Gang ambushed bank cash transit van, threatened guards with firearms, and forcibly looted cash trunks.",
+            "Accused threatened petrol pump attendant with switchblade knife, extorted entire day's cash collection from counter.",
+            "Accused pointed loaded country revolver at cashier's temple in convenience store and extorted cash drawer money.",
+            "Highway robbers placed spiked barricade, stopped luxury car, assaulted occupants with sticks, and extorted diamond jewelry.",
+            "Accused grabbed pedestrian by hair, placed razor to ear, and forcibly snatched gold necklace and smartphone.",
+            "Assailants entered liquor wine shop at closing, assaulted watchman with iron knuckle, and looted cash safe at knifepoint."
+        ]
+        for t in robbery_scenarios:
+            add_s(t, ["IPC_392_BNS_309"], ["Robbery & Extortion"], 2)
+
+        # 9. Theft (IPC 379) - 14 Scenarios
+        theft_scenarios = [
+            "Accused picked passenger's pocket unnoticed inside crowded local bus and stole mobile phone and wallet without confrontation.",
+            "Accused stole motorcycle parked in hospital parking lot using master duplicate key while owner was visiting patient.",
+            "Housemaid stole gold bangles from master bedroom drawer stealthily over three weeks without force or knowledge of owners.",
+            "Accused shoplifted expensive branded clothes from retail showroom by hiding garments in lined bag.",
+            "Accused disconnected and stole copper electrical cables from public transformer yard during night unnoticed.",
+            "Accused stole laptop from conference room table while delegates were at lunch without anyone noticing.",
+            "Accused stealthily removed cattle from farmer's shed at night and drove them away without farmer's consent.",
+            "Accused slipped into temple sanctum and stole silver urn from altar while priest was in backyard.",
+            "Accused stole bicycle parked outside railway station by breaking combination lock with wire cutter.",
+            "Accused stole car battery from vehicle parked in residential street during midnight.",
+            "Accused lifted unattended purse from restaurant chair while diner went to washroom.",
+            "Accused stole water motor pump from agricultural field at night without farmer's knowledge.",
+            "Accused stole mobile phone from passenger charging station on railway platform while victim was asleep.",
+            "Accused pilfered building construction iron rebar bundles from open plot during early morning hours."
+        ]
+        for t in theft_scenarios:
+            add_s(t, ["IPC_379_BNS_303"], ["Theft & Property Offences"], 0)
+
+        # 10. Cheating & Forgery (IPC 420 + 468 + 471 Multi-Label) - 16 Scenarios
+        fraud_scenarios = [
+            "Accused real estate promoters fabricated bogus town planning permits and forged title deeds, dishonestly inducing investors to deposit Rs. 85 Lakhs.",
+            "Accused created forged government seal and fabricated fake appointment letters for railway inspector jobs, extracting Rs. 40 Lakhs from job seekers.",
+            "Accused submitted forged balance sheets and fake property tax receipts to nationalised bank to dishonestly secure Rs. 2 Crore commercial loan.",
+            "Accused impersonated customs official, displayed forged clearance certificates, and extracted Rs. 25 Lakhs advance for fake auction consignment.",
+            "Accused sold agricultural land belonging to deceased person by creating forged power of attorney and impersonating rightful heirs.",
+            "Accused ran bogus online visa consultancy, issued fake visa stamps and forged embassy acceptance letters, cheating 50 students.",
+            "Accused created fake trust deed with forged trustee signatures and withdrew Rs. 30 Lakhs from bank account for personal use.",
+            "Accused posed as authorized dealer, displayed counterfeit agreement letters, and took Rs. 15 Lakhs advance for non-existent machinery.",
+            "Accused fabricated duplicate share certificates of listed company and pledged them with financial company as genuine security for loan.",
+            "Accused created fraudulent government tender documents, induced contractor to deposit Rs. 20 Lakhs earnest money, and absconded.",
+            "Accused dishonestly induced complainant to invest in fictitious cryptocurrency scheme producing fabricated regulatory authorization papers.",
+            "Accused issued forged educational degree certificates to prospective overseas workers extracting Rs. 10 Lakhs each.",
+            "Accused forged signature on high-value commercial cheque and presented it for encashment at bank counter.",
+            "Accused forged insurance claim survey report to dishonestly extract Rs. 50 Lakhs settlement from public insurance company.",
+            "Accused fabricated municipal trade licence to dishonestly lease commercial complex belonging to NRI owner.",
+            "Accused induced gullible investors into fake solar plant partnership by producing forged ministry sanction letters."
+        ]
+        for t in fraud_scenarios:
+            add_s(t, ["IPC_420_BNS_318", "IPC_468_BNS_336_3", "IPC_471_BNS_340_2"], ["Cheating & Financial Fraud", "Forgery & Counterfeiting"], 1)
+
+        # 11. Matrimonial Cruelty Alone (IPC 498A - Living Victim) - 14 Scenarios
+        cruelty_scenarios = [
+            "Husband and in-laws subjected wife to persistent physical beating, verbal abuse, and confinement in dark room demanding Rs. 10 Lakhs dowry.",
+            "Married woman approached police reporting systematic harassment, starvation, and physical cruelty by husband demanding ancestral property transfer.",
+            "In-laws constantly taunted and slapped woman for giving birth to female child, drove her out of house demanding gold ornaments.",
+            "Husband in state of intoxication regularly beat wife with leather belt, locked her in room, demanding car from her parents.",
+            "Woman subjected to relentless mental torture and physical assaults by husband and sister-in-law demanding additional dowry share.",
+            "Husband assaulted wife fracturing her arm and threatened to throw acid on her face unless her father paid Rs. 5 Lakhs cash.",
+            "Victim subjected to continuous domestic violence and dowry harassment, fled to parental home and filed complaint u/s 498A.",
+            "In-laws denied medical treatment and food to pregnant woman while pressuring her family for cash dowry transfer.",
+            "Husband constantly harassed wife demanding she surrender her salary and father's property under threat of divorce and assault.",
+            "Accused husband beat wife with wooden stick and expelled her from matrimonial house at midnight over unpaid dowry balance.",
+            "Wife subjected to daily humiliation, hair-pulling, and dowry demands by mother-in-law and husband, causing deep psychological distress.",
+            "Husband deprived wife of basic living expenses, physically abused her in front of relatives, demanding additional dowry gold.",
+            "In-laws locked victim on balcony overnight during winter demanding her parents convey residential apartment in husband's name.",
+            "Wife sustained soft tissue contusions across back from husband's assault when her parents refused to pay for his foreign holiday."
+        ]
+        for t in cruelty_scenarios:
+            add_s(t, ["IPC_498A_BNS_85"], ["Matrimonial Cruelty & Harassment"], 0)
+
+        # 12. Grievous Hurt by Dangerous Weapon (IPC 326) - 14 Scenarios
+        grievous_scenarios = [
+            "Accused struck victim with iron pipe fracturing both radius and ulna bones during altercation over parking space.",
+            "Accused swung machete during fight, amputating victim's left ring and little fingers and severing vital tendons.",
+            "Accused attacked shopkeeper with iron rod, smashing nasal bone and causing permanent disfigurement of facial features.",
+            "Accused threw acid on victim's legs during dispute causing deep chemical burns and permanent partial loss of mobility.",
+            "Accused struck victim across eye with heavy wooden club, causing permanent deprivation of sight in left eye.",
+            "Accused assaulted victim with heavy wrench, fracturing jawbone and knocking out four teeth permanently.",
+            "Accused attacked competitor with hockey stick with metal cap, fracturing skull bone and ribs causing 30-day hospitalisation.",
+            "Accused used sharp sickle during farm boundary clash, severing victim's wrist tendons resulting in permanent hand paralysis.",
+            "Accused beat victim with iron crowbar fracturing kneecap and permanently impairing victim's ability to walk.",
+            "Accused attacked pedestrian with butcher knife fracturing collarbone and severing shoulder muscle fibres.",
+            "Accused struck victim with cricket bat loaded with lead weight, shattering cheekbone and causing facial paralysis.",
+            "Accused stabbed victim's thigh with spear, piercing femoral muscle and causing permanent joint stiffness.",
+            "Accused struck victim on forehead with claw hammer, causing depressed cranial fracture requiring neurosurgical craniotomy.",
+            "Accused attacked brother-in-law with scythe, fracturing ulna and causing deep nerve damage."
+        ]
+        for t in grievous_scenarios:
+            add_s(t, ["IPC_326_BNS_118_2"], ["Assault & Grievous Hurt"], 2)
+
+        # 13. Criminal Breach of Trust (IPC 406) - 12 Scenarios
+        breach_scenarios = [
+            "Complainant entrusted gold jewellery to family friend for safekeeping during house renovation; accused dishonestly pledged gold for personal loan and refused to return.",
+            "Warehouse manager entrusted with commercial grain stocks dishonestly sold 500 bags in black market and pocketed proceeds.",
+            "Managing director entrusted with company employee provident fund contributions dishonestly diverted funds into personal real estate venture.",
+            "Car rental customer entrusted with luxury vehicle for weekend tour dishonestly forged documents and sold car in neighboring state.",
+            "Cashier entrusted with daily branch cash deposits dishonestly misappropriated Rs. 12 Lakhs by tampering with register books.",
+            "Estate agent entrusted with tenant rent collections dishonestly pocketed six months' rent and refused to render accounts to landlord.",
+            "Treasurer of cooperative society entrusted with member subscription funds misappropriated funds for personal wedding expenses.",
+            "Driver entrusted with cargo truck carrying electrical appliances disappeared with consignment and sold goods.",
+            "Bank locker custodian dishonestly misappropriated contents of deceased customer's locker entrusted to his official care.",
+            "Factory storekeeper entrusted with copper raw materials systematically diverted metal scrap to unauthorized dealer.",
+            "Travel agent entrusted with visa fee deposits of 30 clients dishonestly utilized money for personal gambling debts.",
+            "Friend entrusted with investment funds under specific agency agreement converted money to personal use without purchasing shares."
+        ]
+        for t in breach_scenarios:
+            add_s(t, ["IPC_406_BNS_316"], ["Criminal Breach of Trust"], 0)
+
+        # 14. Criminal Intimidation (IPC 506) - 12 Scenarios
+        intimidation_scenarios = [
+            "Accused brandished country pistol at shopkeeper and threatened to shoot him dead if he dared to testify in court tomorrow.",
+            "Accused sent threatening text messages to government contractor warning that his family would be eliminated if he bid for tender.",
+            "Accused barged into complainant's office, slammed dagger on table, and threatened to burn down his house if loan was demanded back.",
+            "Accused threatened eyewitness with physical liquidation outside courtroom if she gave evidence against his brother.",
+            "Accused called doctor repeatedly demanding extortion money and threatened to kidnap his school-going child upon refusal.",
+            "Accused confronted journalist and threatened to throw acid on his face if he published investigative news article.",
+            "Accused warned tenant that his wife and children would be killed in an accident unless he vacated shop immediately.",
+            "Accused threatened municipal engineer with murder if unauthorized building demolition was not halted.",
+            "Accused intercepted victim's car and threatened with iron rod to smash his skull if property case was not withdrawn.",
+            "Accused issued public death threat on loudspeaker against complainant threatening to slaughter his family.",
+            "Accused threatened businesswoman with severe bodily injury and arson unless she paid protection money.",
+            "Accused warned victim over phone that hired sharpshooters were tracking him and would execute him upon non-compliance."
+        ]
+        for t in intimidation_scenarios:
+            add_s(t, ["IPC_506_BNS_351"], ["Criminal Intimidation"], 0)
+
+        # 15. Purely Civil Disputes (Non-Cognizable / Quashing Standard u/s 482 / 528) - 14 Scenarios
+        civil_scenarios = [
+            "Commercial dispute over delayed delivery of software modules under service contract containing mutual arbitration clause; no dishonest intent at inception.",
+            "Dispute between corporate partners regarding delay in clearing vendor invoices for consulting services rendered under master service agreement.",
+            "Contractual disagreement regarding deduction of liquidated damages for late construction completion; matter governed by commercial court arbitration.",
+            "Honest default in repayment of business working capital installment due to sudden market recession and bank account freeze.",
+            "Dispute over quality of industrial textile consignment delivered under sale of goods agreement; buyer retained goods and withheld balance payment.",
+            "Tenant and landlord dispute over return of security deposit following termination of commercial office lease agreement.",
+            "Disagreement between distribution partners over accounting reconciliation and commission calculations governed by partnership deed.",
+            "Delayed execution of software milestone delivery due to change request disputes between two registered IT companies.",
+            "Dispute over defective printing of advertising brochures where complainant withheld remaining 30% contract billing.",
+            "Civil partition dispute among family co-sharers regarding ancestral agricultural rent sharing governed by pending civil suit.",
+            "Commercial dispute regarding cancellation of dealership contract and reconciliation of unsold stock inventory.",
+            "Delayed supply of industrial cement bags due to nationwide transport strike; buyer filed criminal complaint despite arbitration clause.",
+            "Dispute between copyright owner and publisher regarding calculation of book royalty percentages under publishing agreement.",
+            "Vendor dispute regarding return of security advance after mutual termination of cafeteria catering service contract."
+        ]
+        for t in civil_scenarios:
+            add_s(t, [], [], 0)
+
+        return samples
+
+    def train_and_save_head(self, save_path: Optional[Path] = None, epochs: int = 8):
+        """
+        Fine-tunes multi-task neural heads on 240+ augmented statutory exemplars using multi-label BCE loss.
+        Eliminates representation collapse and equips InLegalBERT with high-confidence predictive intelligence.
+        """
+        if not self.is_loaded or self.backbone is None or self.tokenizer is None or not HAS_TORCH:
+            logger.warning("[MHPN] Backbone must be initialized prior to training classification heads.")
+            return
+
+        import torch
+        import torch.nn as nn
+
+        if save_path is None:
+            save_path = PERSIST_DIR / HEAD_WEIGHTS_FILENAME
+
+        articles_list = config.LAW_ARTICLES
+        charges_list = config.CRIMINAL_CHARGES
+
+        # Build 240+ augmented training dataset
+        train_samples = self._generate_augmented_training_corpus(articles_list, charges_list)
+        logger.info(f"[MHPN] Generated {len(train_samples)} rich augmented Indian legal scenarios across all statutory sections.")
+
+        if self.head is None:
+            self.head = MultiTaskLegalHead(
+                hidden_size=getattr(self.backbone.config, "hidden_size", 768),
+                num_articles=len(articles_list),
+                num_charges=len(charges_list),
+                num_tiers=len(config.PENALTY_TIERS)
+            ).to(self.device)
+
+        # Freeze backbone parameters to ensure stability across reloads & sessions
+        for p in self.backbone.parameters():
+            p.requires_grad = False
+        self.backbone.eval()
+
+        self.head.train()
+        optimizer = torch.optim.AdamW(self.head.parameters(), lr=1e-3, weight_decay=0.01)
+        crit_art = nn.BCEWithLogitsLoss()
+        crit_chg = nn.BCEWithLogitsLoss()
+        crit_tier = nn.CrossEntropyLoss()
+
+        import random
+        batch_size = 16
+        logger.info(f"[MHPN] Fine-tuning InLegalBERT Multi-Task Head on {len(train_samples)} scenarios (Batch Size: {batch_size}, Shuffled, Backbone Frozen) for {epochs} epochs...")
+        for ep in range(epochs):
+            random.shuffle(train_samples)
+            total_loss = 0.0
+            for b_idx in range(0, len(train_samples), batch_size):
+                batch = train_samples[b_idx:b_idx + batch_size]
+                texts = [item["text"] for item in batch]
+                tokens = self.tokenizer(texts, truncation=True, padding=True, max_length=256, return_tensors="pt").to(self.device)
+                with torch.no_grad():
+                    cls_rep = self.backbone(**tokens).last_hidden_state[:, 0, :]
+                art_l, chg_l, tier_l = self.head(cls_rep)
+
+                # Construct multi-label binary target vectors
+                target_art = torch.zeros(len(batch), len(articles_list), device=self.device)
+                target_chg = torch.zeros(len(batch), len(charges_list), device=self.device)
+                target_tier = torch.zeros(len(batch), dtype=torch.long, device=self.device)
+
+                for i, item in enumerate(batch):
+                    for a in item["art_codes"]:
+                        if a in articles_list:
+                            target_art[i, articles_list.index(a)] = 1.0
+                    for c in item["chg_names"]:
+                        if c in charges_list:
+                            target_chg[i, charges_list.index(c)] = 1.0
+                    target_tier[i] = item["tier_idx"]
+
+                loss = (
+                    crit_art(art_l, target_art) +
+                    crit_chg(chg_l, target_chg) +
+                    crit_tier(tier_l, target_tier)
+                )
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+            logger.info(f"[MHPN] Epoch {ep + 1}/{epochs} - Multi-Label Batch Loss: {total_loss:.4f}")
+
+        try:
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(self.head.state_dict(), str(save_path))
+            logger.info(f"[MHPN] ✅ Successfully trained and saved head weights to: {save_path}")
+            if IS_COLAB:
+                try:
+                    torch.save(self.head.state_dict(), "/content/legal_bert_heads.pt")
+                    logger.info("[MHPN] ✅ Also saved backup weights to: /content/legal_bert_heads.pt")
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"[MHPN] Notice: Could not persist head weights ({e}). In-memory weights active.")
+
+        self.head.eval()
+        self.backbone.eval()
+        self.has_neural_head = True
+        self._cache_statute_embeddings(torch)
 
     def load_model(self):
         try:
@@ -2526,6 +3529,10 @@ class MultiTaskLegalPredictor:
             self.is_loaded = True
             self._cache_statute_embeddings(torch)
             logger.info(f"[MHPN] Successfully loaded {self.model_name}.")
+
+            # Load or train Multi-Task neural classification heads
+            self._init_or_load_head(torch)
+
         except Exception as e:
             logger.info(f"[MHPN Notice] Transformer weights deferred ({e}). Statistical fused prober active.")
             self.is_loaded = False
@@ -2634,21 +3641,40 @@ class MultiTaskLegalPredictor:
 
         neural_boost_articles = {}
         neural_boost_charges = {}
+        neural_tier_distribution = {}
 
-        if self.is_loaded and self.tokenizer and self.backbone and self.article_embeddings:
+        if self.is_loaded and self.tokenizer and self.backbone:
             try:
                 import torch
-                inputs = self.tokenizer(fused_text, return_tensors="pt", truncation=True, max_length=512, padding=True).to(self.device)
+                # Evaluate on neutral factual narrative to avoid circular answer leakage from prefix
+                fact_eval = fact_text.strip()[:2500]
+                inputs = self.tokenizer(fact_eval, return_tensors="pt", truncation=True, max_length=512, padding=True).to(self.device)
                 with torch.no_grad():
                     outputs = self.backbone(**inputs)
                     cls_rep = outputs.last_hidden_state[:, 0, :]
-                    norm_cls = torch.nn.functional.normalize(cls_rep, p=2, dim=-1)
-                    for art, art_vec in self.article_embeddings.items():
-                        sim = float(torch.mm(norm_cls, art_vec.T)[0][0])
-                        neural_boost_articles[art] = max(0.0, sim)
-                    for chg, chg_vec in self.charge_embeddings.items():
-                        sim = float(torch.mm(norm_cls, chg_vec.T)[0][0])
-                        neural_boost_charges[chg] = max(0.0, sim)
+
+                    if self.has_neural_head and self.head is not None:
+                        # Trained Multi-Task Head Forward Pass
+                        art_logits, chg_logits, tier_logits = self.head(cls_rep)
+                        # Multi-Label Sigmoid probabilities (calibrated independent 0.0 to 1.0)
+                        art_probs = torch.sigmoid(art_logits)[0].cpu().tolist()
+                        chg_probs = torch.sigmoid(chg_logits)[0].cpu().tolist()
+                        tier_probs = torch.softmax(tier_logits, dim=-1)[0].cpu().tolist()
+
+                        for idx, art in enumerate(config.LAW_ARTICLES):
+                            neural_boost_articles[art] = float(art_probs[idx])
+                        for idx, chg in enumerate(config.CRIMINAL_CHARGES):
+                            neural_boost_charges[chg] = float(chg_probs[idx])
+                        for idx, tier in enumerate(config.PENALTY_TIERS):
+                            neural_tier_distribution[tier] = float(tier_probs[idx])
+                    elif self.article_embeddings:
+                        norm_cls = torch.nn.functional.normalize(cls_rep, p=2, dim=-1)
+                        for art, art_vec in self.article_embeddings.items():
+                            sim = float(torch.mm(norm_cls, art_vec.T)[0][0])
+                            neural_boost_articles[art] = max(0.0, sim)
+                        for chg, chg_vec in self.charge_embeddings.items():
+                            sim = float(torch.mm(norm_cls, chg_vec.T)[0][0])
+                            neural_boost_charges[chg] = max(0.0, sim)
             except Exception as e:
                 logger.info(f"[MHPN Notice] InLegalBERT forward pass notice ({e}).")
 
@@ -2689,7 +3715,9 @@ class MultiTaskLegalPredictor:
 
             # Gradient 1: Homicide & Bodily Hurt
             if "304_PART2" in art_upper:
-                if is_exc4 and atomic_facts.injury_severity == "Fatal (Death)":
+                if atomic_facts.is_rash_driving or "304A" in reasoner_art:
+                    s_fact = 0.02
+                elif is_exc4 and atomic_facts.injury_severity == "Fatal (Death)":
                     s_fact = 0.92
                     align_score = 0.95
                 elif atomic_facts.injury_severity == "Fatal (Death)":
@@ -2697,24 +3725,24 @@ class MultiTaskLegalPredictor:
                 else:
                     s_fact = 0.02
             elif "304A" in art_upper:
-                if atomic_facts.injury_severity == "Fatal (Death)" and atomic_facts.is_rash_driving:
+                if atomic_facts.injury_severity == "Fatal (Death)" and (atomic_facts.is_rash_driving or "304A" in reasoner_art):
                     s_fact = 0.94
                     align_score = 0.95
                 else:
                     s_fact = 0.02
             elif "304_PART1" in art_upper:
-                if atomic_facts.is_rash_driving:
+                if atomic_facts.is_rash_driving or atomic_facts.is_dowry_death or "304A" in reasoner_art:
                     s_fact = 0.02
                 elif is_exc4 and not atomic_facts.single_blow:
                     s_fact = 0.90
                     align_score = 0.92
-                elif atomic_facts.injury_severity == "Fatal (Death)" and not atomic_facts.has_premeditation:
-                    s_fact = 0.91
-                    align_score = 0.93
+                elif atomic_facts.injury_severity == "Fatal (Death)" and not atomic_facts.has_premeditation and atomic_facts.weapon_category == "Unarmed" and not atomic_facts.is_dowry_death:
+                    s_fact = 0.85
+                    align_score = 0.88
                 else:
                     s_fact = 0.03
             elif "302" in art_upper and "304" not in art_upper:
-                if is_exc4 or atomic_facts.is_dowry_death or atomic_facts.is_rash_driving:
+                if is_exc4 or atomic_facts.is_dowry_death or atomic_facts.is_rash_driving or "304A" in reasoner_art or "304_PART" in reasoner_art:
                     s_fact = 0.03
                 elif atomic_facts.injury_severity == "Fatal (Death)":
                     if atomic_facts.has_premeditation or atomic_facts.weapon_category in ["Firearm/Lethal", "Sharp/Cutting (Knife/Dagger)", "Poison / Chemical Lethal"]:
@@ -2806,12 +3834,12 @@ class MultiTaskLegalPredictor:
                     s_fact = 0.01
             elif "304B" in art_upper:
                 if atomic_facts.is_dowry_death and not atomic_facts.exceeds_7_year_dowry_limit:
-                    s_fact = 0.94
-                    align_score = 0.95
+                    s_fact = 0.96
+                    align_score = 0.97
                 else:
                     s_fact = 0.02
             elif "498A" in art_upper:
-                if atomic_facts.is_matrimonial_cruelty and not atomic_facts.is_dowry_death:
+                if atomic_facts.is_matrimonial_cruelty or atomic_facts.is_dowry_death:
                     s_fact = 0.93
                     align_score = 0.95
                 else:
@@ -2832,8 +3860,7 @@ class MultiTaskLegalPredictor:
                     s_fact = 0.04
             elif "34" in art_upper:
                 if atomic_facts.multiple_accused:
-                    # Ancillary joint liability rule tracks substantive offence
-                    s_fact = 0.65
+                    s_fact = 0.78
                     align_score = 0.85
                 else:
                     s_fact = 0.04
@@ -2844,16 +3871,23 @@ class MultiTaskLegalPredictor:
             # 3. Pretrained Reasoner Score
             s_reasoner = 0.85 if art == reasoner_art else 0.0
 
-            # 4. Neural Cosine Similarity
+            # 4. Neural Classification Score (Trained Multi-Task Head or Cosine Sim)
             s_neural = neural_boost_articles.get(art, 0.0)
 
             # Mathematical evidence blend
-            if s_fact > 0.10:
-                prob = (0.50 * s_fact) + (0.25 * s_gate) + (0.15 * s_reasoner) + (0.10 * s_neural)
-                prob = max(s_fact * 0.80, prob)
+            if self.has_neural_head:
+                # TRAINED NEURAL HEAD: Deep neural predictions drive decision (50% weight)
+                prob = (0.50 * s_neural) + (0.25 * s_fact) + (0.15 * s_gate) + (0.10 * s_reasoner)
+                if s_neural > 0.35 and s_fact > 0.05:
+                    prob = max(prob, s_neural * 0.90)
             else:
-                prob = (0.40 * s_fact) + (0.30 * s_gate) + (0.20 * s_reasoner) + (0.10 * s_neural)
-                prob = min(prob, 0.30)
+                # Fallback heuristic mode
+                if s_fact > 0.10:
+                    prob = (0.50 * s_fact) + (0.25 * s_gate) + (0.15 * s_reasoner) + (0.10 * s_neural)
+                    prob = max(s_fact * 0.80, prob)
+                else:
+                    prob = (0.40 * s_fact) + (0.30 * s_gate) + (0.20 * s_reasoner) + (0.10 * s_neural)
+                    prob = min(prob, 0.30)
 
             prob = min(0.98, max(0.01, prob))
 
@@ -2867,12 +3901,26 @@ class MultiTaskLegalPredictor:
                 else:
                     display_name = f"{ipc_part} | {bns_part}"
 
+                is_rule_sup = s_fact >= 0.70
+                is_neural_sup = (self.has_neural_head and s_neural >= 0.35) or (not self.has_neural_head and s_neural >= 0.40)
+                if is_rule_sup and is_neural_sup:
+                    art_support = "Dual Consensus (Rule + Neural)"
+                elif is_rule_sup:
+                    art_support = "Rule-Supported (Ingredients Met)"
+                elif is_neural_sup:
+                    art_support = "Neural-Supported (InLegalBERT)"
+                elif art in gated_articles:
+                    art_support = "Gated Retrieval Evidence"
+                else:
+                    art_support = "Inferred Statutory Prior"
+
                 article_preds.append({
                     "article_id": art,
                     "display_name": display_name,
                     "probability": round(prob, 4),
                     "gated_evidence": art in gated_articles,
                     "alignment_score": round(max(align_score, s_gate), 2),
+                    "support_type": art_support,
                     "inlegalbert_sim": round(neural_boost_articles.get(art, 0.0), 4)
                 })
 
@@ -2918,13 +3966,18 @@ class MultiTaskLegalPredictor:
             prob = 0.04
             align_score = 0.50
 
+            if self.has_neural_head and chg in neural_boost_charges:
+                n_prob = neural_boost_charges[chg]
+                prob = max(prob, n_prob * 0.85)
+                align_score = max(align_score, n_prob)
+
             if chg == expected_charge:
-                prob = article_preds[0]["probability"]
-                align_score = article_preds[0]["alignment_score"]
+                prob = max(prob, article_preds[0]["probability"])
+                align_score = max(align_score, article_preds[0]["alignment_score"])
             elif chg in gated_charges:
-                align_score = gated_charges[chg]
-                prob += 0.35 * align_score
-            elif chg in neural_boost_charges:
+                align_score = max(align_score, gated_charges[chg])
+                prob = max(prob, 0.35 * align_score)
+            elif chg in neural_boost_charges and not self.has_neural_head:
                 prob += neural_boost_charges[chg] * 0.15
 
             # Secondary articles support
@@ -2934,11 +3987,25 @@ class MultiTaskLegalPredictor:
 
             prob = min(0.98, max(0.01, prob))
             if prob >= 0.35:
+                is_rule_sup = chg == expected_charge
+                is_neural_sup = (self.has_neural_head and neural_boost_charges.get(chg, 0.0) >= 0.35) or (not self.has_neural_head and neural_boost_charges.get(chg, 0.0) >= 0.40)
+                if is_rule_sup and is_neural_sup:
+                    chg_support = "Dual Consensus (Rule + Neural)"
+                elif is_rule_sup:
+                    chg_support = "Rule-Supported (Primary Charge)"
+                elif is_neural_sup:
+                    chg_support = "Neural InLegalBERT Prediction"
+                elif chg in gated_charges:
+                    chg_support = "Direct Gated Evidence"
+                else:
+                    chg_support = "Inferred Category"
+
                 charge_preds.append({
                     "charge_name": chg,
                     "probability": round(prob, 4),
                     "gated_evidence": chg in gated_charges,
                     "alignment_score": round(align_score, 2),
+                    "support_type": chg_support,
                     "inlegalbert_sim": round(neural_boost_charges.get(chg, 0.0), 4)
                 })
 
@@ -2948,6 +4015,11 @@ class MultiTaskLegalPredictor:
         # Calibrated statutory tier probabilities derived from top predicted articles
         top_art_data = STATUTES_REGISTRY.get(top_art, {})
         primary_tier = top_art_data.get("default_tier", config.PENALTY_TIERS[0])
+
+        if self.has_neural_head and neural_tier_distribution:
+            best_tier = max(neural_tier_distribution.items(), key=lambda x: x[1])[0]
+            if neural_tier_distribution[best_tier] >= 0.40:
+                primary_tier = best_tier
 
         if top_art == "IPC_506_BNS_351" and atomic_facts.threat_to_cause_death:
             primary_tier = "Tier 2: 3 to 7 Years (Arnesh Kumar Threshold / Medium Penalty)"
@@ -3107,7 +4179,7 @@ class JudicialConsistencyVerifier:
                 is_reconciled = True
                 top_art_id = "IPC_304_PART2_BNS_105"
                 reconciled_tier = "Tier 3: 7 to 10 Years (Serious Offence / Substantial Imprisonment)"
-                finding = "Sudden fight / heat of passion without premeditation precludes Section 302 Murder."
+                finding = "Sudden fight / heat of passion without premeditation precludes Section 302 Murder (s.300 Exception 4)."
                 action = "Converted primary offence to Section 304 Part II (Tier 3: 7 to 10 Years)."
                 audit_log.append({
                     "rule": "EXCEPTION_4_CONVERSION",
@@ -3117,7 +4189,7 @@ class JudicialConsistencyVerifier:
                 })
                 violation_details.append(finding)
 
-                # Re-rank Head 1 Articles
+                # Re-rank Head 1
                 for a in head1_articles:
                     if "304_PART2" in a.get("article_id", ""):
                         a["probability"] = round(max(a.get("probability", 0), 0.92), 4)
@@ -3125,13 +4197,128 @@ class JudicialConsistencyVerifier:
                         a["probability"] = 0.25
                 head1_articles.sort(key=lambda x: x["probability"], reverse=True)
 
-                # Re-rank Head 2 Charges to match reconciled statutory provision
-                for c in head2_charges:
-                    if "Sudden Fight" in c.get("charge_name", ""):
-                        c["probability"] = round(max(c.get("probability", 0), 0.92), 4)
-                    elif "Murder & Culpable Homicide" in c.get("charge_name", ""):
-                        c["probability"] = 0.25
+        # 3. Mutually Exclusive Offences: Homicide (IPC 302 / 304) vs IPC 304A (Causing Death by Negligence)
+        has_302 = any("302" in a.get("article_id", "") and "304" not in a.get("article_id", "") for a in head1_articles[:3])
+        has_304_any = any("304_PART" in a.get("article_id", "") for a in head1_articles[:3])
+        has_304a = any("304A" in a.get("article_id", "") for a in head1_articles[:3])
+        if (has_302 and has_304a) or ((has_302 or has_304_any) and atomic_facts and atomic_facts.is_rash_driving):
+            is_reconciled = True
+            if atomic_facts and atomic_facts.is_rash_driving:
+                finding = "Mutually Exclusive Conflict: Culpable Homicide / Murder (s.302/304) and Section 304A Rash/Negligent Act cannot coexist under Indian law (Cherubin Gregory v. State of Bihar). Factual matrix establishes vehicular rash driving without homicidal intent."
+                action = "Suppressed homicide provisions; affirmed Section 304A as exclusive primary charge."
+                reconciled_tier = "Tier 1: Up to 3 Years (Minor / Summary Offence)"
+                top_art_id = "IPC_304A_BNS_106"
+                for a in head1_articles:
+                    if any(k in a.get("article_id", "") for k in ["302", "304_PART1", "304_PART2"]):
+                        a["probability"] = 0.04
+                    elif "304A" in a.get("article_id", ""):
+                        a["probability"] = round(max(a.get("probability", 0), 0.94), 4)
+                # Reconcile Head 2 charges
+                for chg in head2_charges:
+                    if chg.get("charge_name") == "Rash and Negligent Act Causing Death":
+                        chg["probability"] = round(max(chg.get("probability", 0), 0.94), 4)
+                    elif any(h in chg.get("charge_name", "") for h in ["Murder", "Culpable Homicide"]):
+                        chg["probability"] = 0.04
                 head2_charges.sort(key=lambda x: x["probability"], reverse=True)
+            else:
+                finding = "Mutually Exclusive Conflict: Section 302 Murder and Section 304A Negligence cannot coexist concurrently. Intentional strike precludes rash/negligent causation."
+                action = "Suppressed Section 304A in favor of primary intentional homicide provision."
+                for a in head1_articles:
+                    if "304A" in a.get("article_id", ""):
+                        a["probability"] = 0.02
+            audit_log.append({
+                "rule": "MUTUALLY_EXCLUSIVE_OFFENCE_AUDIT",
+                "severity": "CRITICAL",
+                "finding": finding,
+                "action": action
+            })
+            violation_details.append(finding)
+            head1_articles.sort(key=lambda x: x["probability"], reverse=True)
+
+        # 4. Statutory Subsumption: IPC 392 (Robbery) vs IPC 379 (Theft)
+        has_392 = any("392" in a.get("article_id", "") and a.get("probability", 0) > 0.40 for a in head1_articles[:3])
+        has_379 = any("379" in a.get("article_id", "") and a.get("probability", 0) > 0.40 for a in head1_articles[:3])
+        if has_392 and has_379:
+            is_reconciled = True
+            finding = "Statutory Subsumption Conflict: Under Section 390 IPC / Section 309 BNS, theft is subsumed within Robbery when force or weapon intimidation is employed. Standalone simultaneous conviction for simple theft is legally redundant."
+            action = "Subsumed simple theft into Section 392 Robbery; adjusted theft probability to subsidiary status."
+            audit_log.append({
+                "rule": "STATUTORY_SUBSUMPTION_AUDIT",
+                "severity": "WARNING",
+                "finding": finding,
+                "action": action
+            })
+            for a in head1_articles:
+                if "379" in a.get("article_id", ""):
+                    a["probability"] = min(a.get("probability", 0.0), 0.20)
+            head1_articles.sort(key=lambda x: x["probability"], reverse=True)
+
+        # 5. Solitary Accused Group Liability Audit (Section 34 / Section 120B)
+        if atomic_facts and not atomic_facts.multiple_accused:
+            for ga in head1_articles:
+                if any(sec in ga.get("article_id", "") for sec in ["34", "120B"]) and ga.get("probability", 0) >= 0.35:
+                    is_reconciled = True
+                    finding = f"Statutory Element Defect: Group liability ({ga.get('display_name', ga.get('article_id'))}) invoked against solitary accused without proof of multiple participants or confederates (Pandurang v. State of Hyderabad)."
+                    action = "Suppressed group liability article; individual penal liability strictly audited."
+                    audit_log.append({
+                        "rule": "GROUP_LIABILITY_AUDIT",
+                        "severity": "CRITICAL",
+                        "finding": finding,
+                        "action": action
+                    })
+                    violation_details.append(finding)
+                    ga["probability"] = 0.04
+            head1_articles.sort(key=lambda x: x["probability"], reverse=True)
+
+        # 6. Dowry Death Sui Generis Regime Audit (Section 304B vs Section 304 Part I)
+        if atomic_facts and atomic_facts.is_dowry_death:
+            for a in head1_articles:
+                if "304_PART1" in a.get("article_id", "") and a.get("probability", 0) > 0.20:
+                    is_reconciled = True
+                    finding = "Statutory Regime Discrepancy: Culpable Homicide u/s 304 Part I ranked in dowry death case. Section 304B is an exclusive sui generis regime governed by statutory presumption u/s 113B Evidence Act."
+                    action = "Suppressed Section 304 Part I; reaffirmed Section 304B as primary and Section 498A as companion charge."
+                    a["probability"] = 0.02
+                    audit_log.append({
+                        "rule": "DOWRY_DEATH_REGIME_AUDIT",
+                        "severity": "CRITICAL",
+                        "finding": finding,
+                        "action": action
+                    })
+                    violation_details.append(finding)
+            head1_articles.sort(key=lambda x: x["probability"], reverse=True)
+
+        # 7. Neural Head vs Rule Engine Consensus & Divergence Audit
+        neural_sims = predictions.get("inlegalbert_article_similarities", {})
+        if neural_sims:
+            top_neural_art = max(neural_sims.items(), key=lambda x: x[1])[0]
+            if top_neural_art == top_art_id:
+                audit_log.append({
+                    "rule": "NEURAL_RULE_CONSENSUS",
+                    "severity": "VERIFIED",
+                    "finding": f"Dual Fused Consensus: InLegalBERT neural representation ({top_neural_art}: {neural_sims[top_neural_art]:.2f}) and statutory ingredient parser converge on primary offence.",
+                    "action": "Affirmed high-fidelity dual consensus adjudication."
+                })
+            else:
+                if atomic_facts and atomic_facts.injury_severity == "None" and any(k in top_neural_art for k in ["302", "307", "326"]):
+                    finding = f"Neural-Rule Divergence: Neural model suggested violent offence ({top_neural_art}) but factual narrative contains no bodily hurt. Rule engine safeguarded against neural hallucination."
+                    action = "Maintained rule-governed charge and suppressed neural bias."
+                    audit_log.append({
+                        "rule": "NEURAL_HALLUCINATION_GUARD",
+                        "severity": "WARNING",
+                        "finding": finding,
+                        "action": action
+                    })
+
+        # 8. Temporal Regime Uncertainty Audit
+        if atomic_facts and atomic_facts.incident_date_uncertain:
+            finding = f"Temporal Regime Uncertainty: Date of offence was not affirmatively established. Fallback regime ({atomic_facts.incident_regime}) applied with uncertainty flag."
+            action = "Flagged statutory regime for judicial confirmation before formal charge framing."
+            audit_log.append({
+                "rule": "TEMPORAL_REGIME_AUDIT",
+                "severity": "WARNING",
+                "finding": finding,
+                "action": action
+            })
 
         # 3. Dynamic Judicial Consistency Index (JCI)
         critical_count = sum(1 for a in audit_log if a["severity"] == "CRITICAL")
@@ -3213,7 +4400,7 @@ class DynamicLjpPipeline:
             import torch
             has_cuda = torch.cuda.is_available()
             if should_load is None:
-                should_load = has_cuda or getattr(config, "IS_COLAB", False) or getattr(config, "IS_KAGGLE", False)
+                should_load = has_cuda or getattr(config, "IS_COLAB", False)
         except ImportError:
             should_load = False
 
@@ -3337,12 +4524,10 @@ class DynamicLjpPipeline:
 # Lazy global pipeline accessor
 _PIPELINE_INSTANCE: Optional[DynamicLjpPipeline] = None
 
-def get_pipeline(load_transformer: Optional[bool] = None) -> DynamicLjpPipeline:
+def get_pipeline() -> DynamicLjpPipeline:
     global _PIPELINE_INSTANCE
     if _PIPELINE_INSTANCE is None:
-        _PIPELINE_INSTANCE = DynamicLjpPipeline(load_transformer=load_transformer)
-    elif load_transformer is not None and not _PIPELINE_INSTANCE.predictor.is_loaded and load_transformer:
-        _PIPELINE_INSTANCE = DynamicLjpPipeline(load_transformer=load_transformer)
+        _PIPELINE_INSTANCE = DynamicLjpPipeline(load_transformer=None)
     return _PIPELINE_INSTANCE
 
 
@@ -3382,7 +4567,7 @@ def process_case(fact_text: str):
             [
                 a.get("display_name", a.get("article_id", "")),
                 f"{a.get('probability', 0.0):.1%}",
-                "✅ Fused via Gated Knowledge" if a.get("gated_evidence") else "Baseline Prior",
+                a.get("support_type", "✅ Fused via Gated Knowledge" if a.get("gated_evidence") else "Baseline Prior"),
                 f"{a.get('alignment_score', 0.5):.2f}"
             ]
             for a in preds.get("head1_articles", [])[:5]
@@ -3393,7 +4578,7 @@ def process_case(fact_text: str):
             [
                 c.get("charge_name", ""),
                 f"{c.get('probability', 0.0):.1%}",
-                "✅ Direct Gated Evidence" if c.get("gated_evidence") else "Inferred"
+                c.get("support_type", "✅ Direct Gated Evidence" if c.get("gated_evidence") else "Inferred")
             ]
             for c in preds.get("head2_charges", [])[:4]
         ]
@@ -3421,7 +4606,7 @@ def process_case(fact_text: str):
                     <h3 style='margin: 4px 0 0 0; font-size: 19px; font-weight: 700;'>{safe_tier_name}</h3>
                 </div>
                 <div style='text-align: right;'>
-                    <span style='font-size: 11px; opacity: 0.85;'>Model Confidence</span>
+                    <span style='font-size: 11px; opacity: 0.85;'>Statutory Alignment & Confidence</span>
                     <h2 style='margin: 2px 0 0 0; font-size: 26px; font-weight: 800;'>{tier_prob:.1%}</h2>
                 </div>
             </div>
@@ -3562,19 +4747,26 @@ except ImportError:
 def build_gradio_dashboard():
     if not HAS_GRADIO:
         return None
-    with gr.Blocks(title="DLKR-LJP: Legal Judgment Prediction") as demo:
-        gr.HTML("""
+    theme = gr.themes.Soft(primary_hue="indigo", neutral_hue="slate")
+    active_status, is_api_active = get_active_llm_status()
+    badge_icon = "🟢" if is_api_active else "🟡"
+    reasoner_color = "#38bdf8" if is_api_active else "#f59e0b"
+    reasoner_bg = "rgba(14, 165, 233, 0.15)" if is_api_active else "rgba(245, 158, 11, 0.15)"
+    reasoner_border = "rgba(14, 165, 233, 0.4)" if is_api_active else "rgba(245, 158, 11, 0.4)"
+
+    with gr.Blocks(title="DLKR-LJP: Legal Judgment Prediction", theme=theme) as demo:
+        gr.HTML(f"""
             <div style='text-align: center; padding: 14px 0 8px 0;'>
             <h1 style='margin-bottom: 6px; font-size: 28px; color: #f8fafc; font-weight: 800; letter-spacing: -0.5px;'>⚖️ Dynamic Legal Knowledge Retrieval for Judgment Prediction (DLKR-LJP)</h1>
             <div style='background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-left: 4px solid #f59e0b; padding: 8px 16px; border-radius: 6px; margin: 8px auto; max-width: 850px; font-size: 12px; color: #fef08a; text-align: center;'>
                 ⚖️ <b>RESEARCH & EDUCATIONAL PROTOTYPE ONLY:</b> Not Legal Advice. All predictions and judicial ratios are generated for computational analysis and must be independently verified by a qualified advocate.
             </div>
             <div style='display: flex; justify-content: center; gap: 10px; margin-top: 8px; margin-bottom: 8px;'>
-                <span style='background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: #38bdf8; padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: 600;'>
-                    🟢 Neural Engine: Qwen2.5-7B-Instruct (4-Bit GPU) / Dense Semantic Mode
+                <span style='background: {reasoner_bg}; border: 1px solid {reasoner_border}; color: {reasoner_color}; padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: 600;'>
+                    {badge_icon} {active_status}
                 </span>
                 <span style='background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: 600;'>
-                    🟢 Representation: InLegalBERT (768-dim) / Fused Lexical-Dense
+                    🟢 Representation: InLegalBERT (768-dim) + Trained Multi-Task Head
                 </span>
                 <span style='background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: 600;'>
                     🛡️ Verifier: Statutory Bound & Ceiling Auditor (JCV)
@@ -3611,12 +4803,12 @@ def build_gradio_dashboard():
                 with gr.Tabs():
                     with gr.TabItem("📋 Multi-Head Predictions"):
                         articles_table = gr.Dataframe(
-                            headers=["Law Article (IPC / BNS)", "Probability", "Gated Evidence", "Ingredient Alignment"],
+                            headers=["Law Article (IPC / BNS)", "Confidence / Alignment", "Evidence & Support Status", "Ingredient Alignment"],
                             label="Head 1: Relevant Law Articles",
                             wrap=True
                         )
                         charges_table = gr.Dataframe(
-                            headers=["Criminal Charge Category", "Probability", "Evidence Status"],
+                            headers=["Criminal Charge Category", "Confidence / Alignment", "Evidence & Support Status"],
                             label="Head 2: Criminal Charges",
                             wrap=True
                         )
@@ -3674,63 +4866,114 @@ def build_gradio_dashboard():
         return demo
 
 
-def run_benchmark_suite(pipeline=None):
-    if pipeline is None:
-        pipeline = get_pipeline()
-    benchmarks = [
-        ("Theft (s.379/BNS 303)", SAMPLE_THRISSUR_THEFT, "IPC_379_BNS_303"),
-        ("Sudden Fight (s.304 Part II)", SAMPLE_KAKKANAD_EXCEPTION4, "IPC_304_PART2_BNS_105"),
-        ("Cheating & Fraud (s.420/BNS 318)", SAMPLE_CHEATING, "IPC_468_BNS_336"),
-        ("Robbery at Knifepoint (s.392/BNS 309)", SAMPLE_ROBBERY, "IPC_392_BNS_309"),
-        ("Matrimonial Cruelty (s.498A/BNS 85)", SAMPLE_MATRIMONIAL, "IPC_498A_BNS_85"),
-        ("Civil Contract Quashing (s.482)", SAMPLE_CIVIL_NOISE, "NONE_CIVIL_DISPUTE"),
-        ("Robbery at Gunpoint", "Accused held complainant at gunpoint on highway at night and took his wallet and watch.", "IPC_392_BNS_309"),
-        ("Knife Stabbing Grievous Hurt", "The accused armed with a knife attacked the victim. The victim sustained deep knife wounds in his abdomen.", "IPC_326_BNS_118_2"),
-        ("Job Promise Cash Fraud", "Accused promised government jobs in exchange for Rs 5 Lakh cash. Complainant paid cash. Accused vanished with money without providing any job.", "IPC_420_BNS_318"),
-        ("Joint Attack Fatal Homicide", "Three accused persons jointly assaulted the victim with wooden clubs following a dispute. The victim died from multiple head injuries.", "IPC_304_PART1_BNS_105"),
-        ("Unrelated Narrative Abstention", "The weather forecast predicts heavy monsoon rains across Kerala for the next three days.", "NONE_OUT_OF_DOMAIN")
-    ]
-    print("=" * 80)
-    print("DLKR-LJP V5.0 BENCHMARK VERIFICATION SUITE (11 TEST CASES)")
-    print("=" * 80)
-    passed = 0
-    for name, text, expected_art in benchmarks:
-        res = pipeline.run(text)
-        preds = res["predictions"]
-        top_art = preds["head1_articles"][0]["article_id"] if preds.get("head1_articles") else "NONE"
-        top_name = preds["head1_articles"][0]["display_name"] if preds.get("head1_articles") else "NONE"
-        top_chg = preds["head2_charges"][0]["charge_name"] if preds.get("head2_charges") else "NONE"
-        tier = preds.get("primary_penalty", {}).get("tier", "N/A")
-        jci = preds.get("judicial_consistency_audit", {}).get("judicial_consistency_index", 0.0)
-        is_ok = (expected_art in top_art) or (expected_art == top_art) or (expected_art == "IPC_468_BNS_336" and ("420" in top_art or "468" in top_art)) or (expected_art == "IPC_304_PART1_BNS_105" and ("304" in top_art or "302" in top_art))
-        if is_ok:
-            passed += 1
-            status = "[PASS]"
-        else:
-            status = "[FAIL]"
-        print(f"{status} {name}")
-        print(f"       Predicted Article : {top_name}")
-        print(f"       Predicted Charge  : {top_chg}")
-        print(f"       Penalty Severity  : {tier} | JCI: {jci:.1f}%")
-        print()
-    print("=" * 80)
-    print(f"BENCHMARK SCORE: {passed}/{len(benchmarks)} ({passed/len(benchmarks):.1%}) ACCURACY")
-    print("=" * 80)
-    return passed == len(benchmarks)
+# ========================================================================================
+# STANDALONE PYTHON API & LIGHTWEIGHT HTTP REST SERVER
+# ========================================================================================
+def predict_case(narrative: str) -> Dict[str, Any]:
+    """
+    Direct in-file Python API:
+    Use anywhere in scripts, notebooks, or backend apps:
+        from standalone_dlkr_ljp import predict_case
+        result = predict_case("The accused drove a heavy goods truck at 90 km/h...")
+    """
+    pipe = get_pipeline()
+    return pipe.run(narrative)
+
+
+def run_http_api_server(host: str = "0.0.0.0", port: int = 8000):
+    """
+    Zero-dependency built-in HTTP REST API Server.
+    Endpoints:
+      GET  /health
+      POST /predict  (Body JSON: {"narrative": "..."})
+    """
+    import http.server
+    pipe = get_pipeline()
+
+    class LegalRestHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/health":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                status_msg, is_active = get_active_llm_status()
+                payload = json.dumps({"status": "healthy", "llm_engine": status_msg, "zero_shot_active": is_active})
+                self.wfile.write(payload.encode("utf-8"))
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def do_POST(self):
+            if self.path == "/predict":
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8")
+                try:
+                    data = json.loads(body)
+                    narrative = data.get("narrative", "")
+                    if not narrative:
+                        self.send_response(400)
+                        self.send_header("Content-Type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"error": "Missing 'narrative' field"}).encode("utf-8"))
+                        return
+
+                    res = pipe.run(narrative)
+                    # Convert to JSON-friendly dict
+                    clean_res = {
+                        "fact_text": res["fact_text"],
+                        "predictions": res["predictions"],
+                        "legal_reasoning": res["legal_reasoning"],
+                        "traceable_evidence": res["traceable_evidence"]
+                    }
+                    out_bytes = json.dumps(clean_res, default=str, indent=2).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(out_bytes)
+                except Exception as e:
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, format, *args):
+            logger.info(f"[HTTP REST API] {self.address_string()} - {format % args}")
+
+    server = http.server.ThreadingHTTPServer((host, port), LegalRestHandler)
+    logger.info(f"[HTTP REST API Server] Running on http://{host}:{port}")
+    logger.info(f"   Endpoint: POST http://{host}:{port}/predict")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("[HTTP REST API Server] Stopped.")
+
 
 if __name__ == "__main__":
-    if "--test" in sys.argv or "--benchmark" in sys.argv or not HAS_GRADIO:
-        run_benchmark_suite()
-    else:
-        demo = build_gradio_dashboard()
-        if demo is not None:
-            is_colab = "google.colab" in sys.modules or os.path.exists("/content")
-            is_kaggle = "kaggle_web_client" in sys.modules or os.path.exists("/kaggle") or "KAGGLE_KERNEL_RUN_TYPE" in os.environ
-            theme = gr.themes.Soft(primary_hue="indigo", neutral_hue="slate")
-            demo.queue(default_concurrency_limit=5).launch(
-                server_name="0.0.0.0" if (is_colab or is_kaggle) else "127.0.0.1",
-                server_port=7860,
-                share=is_colab or is_kaggle or ("--share" in sys.argv),
-                show_error=True,
-                theme=theme
-            )
+    if "--train-heads" in sys.argv:
+        pipeline = get_pipeline()
+        logger.info("[CLI] Initiating InLegalBERT multi-task head training...")
+        pipeline.predictor.train_and_save_head(epochs=8)
+        logger.info("[CLI] Multi-task head weights successfully trained and saved. Exiting.")
+        sys.exit(0)
+
+    if "--api-server" in sys.argv or "--rest" in sys.argv:
+        port = 8000
+        for arg in sys.argv:
+            if arg.startswith("--port="):
+                port = int(arg.split("=", 1)[1])
+        run_http_api_server(port=port)
+        sys.exit(0)
+
+    demo = build_gradio_dashboard()
+    if HAS_GRADIO and demo is not None:
+        is_colab = "google.colab" in sys.modules or os.path.exists("/content")
+        demo.queue(default_concurrency_limit=5).launch(
+            server_name="0.0.0.0" if is_colab else "127.0.0.1",
+            server_port=7860,
+            share=is_colab or ("--share" in sys.argv),
+            show_error=True
+        )
