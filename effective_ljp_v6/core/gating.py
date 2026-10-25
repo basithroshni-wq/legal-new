@@ -225,7 +225,7 @@ class RelevanceAndConfidenceGate:
                 rejection_reason = "Disqualified: Section 364A requires kidnapping or abduction for ransom."
 
             # Cyber Phishing / Personation
-            elif getattr(facts, "is_cyber_phishing", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_406_IPC"):
+            elif getattr(facts, "is_cyber_phishing", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_406_IPC", "STAT_419_IPC", "STAT_420_IPC"):
                 is_disqualified = True
                 rejection_reason = "Disqualified: Cheating by personation using computer resource is governed by Section 66D IT Act."
 

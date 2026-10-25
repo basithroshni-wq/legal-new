@@ -1195,7 +1195,7 @@ def run_benchmark():
             remaining_cases = TOTAL_CASES - idx
             eta = remaining_cases / rate if rate > 0 else 0
             print(f"[*] Processed {idx:,}/{TOTAL_CASES:,} cases ({idx/TOTAL_CASES*100:.1f}%) | "
-                  f"Passed: {passed_total:,} | Speed: {rate:.1f} cases/sec | Elapsed: {elapsed:.1f}s | ETA: {eta:.1f}s")
+                  f"Passed: {passed_total:,} | Speed: {rate:.1f} cases/sec | Elapsed: {elapsed:.1f}s | ETA: {eta:.1f}s", flush=True)
 
     total_time = time.time() - start_time
     overall_accuracy = (passed_total / TOTAL_CASES) * 100.0

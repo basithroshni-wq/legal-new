@@ -772,7 +772,7 @@ class ScopedFactExtractor:
 
         # --- 30. Cheating by Personation (Section 419 IPC / Section 319 BNS) ---
         cheating_personation_match = bool(re.search(r"\b(section 419\b|section 319 bns|cheating by (?:impersonation|personation)|posing as (?:an? )?(?:ias|ips|police officer|cbi|judge|government officer|officer)|pretended to be.*officer|alias and forged credentials.*plot allotment|obtained.*allotment.*posing as)\b", lower))
-        if cheating_personation_match and not death_caused and not is_extortion:
+        if cheating_personation_match and not death_caused and not is_extortion and not is_cyber_phishing:
             is_cheating_personation = True
             tokens.append("cheating_by_personation")
             tokens.append("pretending_to_be_another_or_fictitious_person")
