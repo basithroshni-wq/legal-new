@@ -418,6 +418,8 @@ class RelevanceAndConfidenceGate:
                 domain_protected = True
             elif getattr(facts, "is_house_trespass", False) and candidate.id in ("STAT_448_IPC", "STAT_447_IPC"):
                 domain_protected = True
+            elif getattr(facts, "is_housebreaking", False) and candidate.id == "STAT_457_IPC":
+                domain_protected = True
             elif getattr(facts, "is_criminal_trespass", False) and candidate.id in ("STAT_447_IPC", "STAT_448_IPC"):
                 domain_protected = True
             elif getattr(facts, "is_breach_of_trust_clerk_servant", False) and candidate.id == "STAT_408_IPC":

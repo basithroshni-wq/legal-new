@@ -161,8 +161,11 @@ class CalibratedLegalPredictor:
                 elif cand.id == "STAT_448_IPC":
                     z += 0.80
 
-            if getattr(facts, "is_housebreaking", False) and cand.id == "STAT_457_IPC":
-                z += 1.20
+            if getattr(facts, "is_housebreaking", False):
+                if cand.id == "STAT_457_IPC":
+                    z += 2.40
+                elif cand.id in ("STAT_379_IPC", "STAT_447_IPC", "STAT_448_IPC"):
+                    z -= 0.80
 
             if getattr(facts, "is_theft_in_dwelling", False) and cand.id == "STAT_380_IPC":
                 z += 1.00
@@ -323,9 +326,9 @@ class CalibratedLegalPredictor:
 
             if facts.is_commercial_civil_dispute:
                 if cand.id == "STAT_CIVIL_482":
-                    z += 1.50
-                elif cand.id in ("STAT_406_IPC", "STAT_420_IPC", "STAT_468_IPC", "STAT_506_IPC", "STAT_302_IPC", "STAT_304_P1_IPC", "STAT_304_P2_IPC"):
-                    z -= 1.00
+                    z += 2.20
+                elif cand.id in ("STAT_406_IPC", "STAT_420_IPC", "STAT_447_IPC", "STAT_448_IPC", "STAT_468_IPC", "STAT_506_IPC", "STAT_302_IPC", "STAT_304_P1_IPC", "STAT_304_P2_IPC"):
+                    z -= 1.20
 
             # Inchoate and vicarious liability provisions cannot eclipse substantive charges
             if cand.id in ("STAT_34_IPC", "STAT_120B_IPC"):

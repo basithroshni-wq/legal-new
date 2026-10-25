@@ -120,7 +120,7 @@ class ScopedFactExtractor:
             (r"\b(mortgage foreclosure|sarfaesi proceedings|housing loan.*defaulted)\b", "Banking & SARFAESI Act, 2002 (Mortgage Foreclosure)"),
             (r"\b(benami transaction|benami property|prohibition of benami property transactions act|purchased from.*funds.*benami)\b", "Benami Transactions (Prohibition) Act, 1988 (Suit for Declaration of Title / Benami Property)"),
             (r"\b(technology transfer agreement|source code transfer|proprietary ai software code|proprietary software code|seeks specific performance and damages)\b", "Specific Relief Act, 1963 / Contract Law (Specific Performance of Technology Transfer Agreement)"),
-            (r"\b(commercial lease termination|terminated a \d+-year lease|lease of a showroom|interior fit-outs|compensation for fit-outs|early termination of lease)\b", "Commercial Property & Contract Law (Commercial Lease Early Termination Dispute)"),
+            (r"\b(commercial lease termination|(?:early|premature)?\s*termination of (?:a \d+-year )?commercial lease|lease of a showroom|interior fit-outs?|compensation for fit-outs?|early termination of lease)\b", "Commercial Property & Contract Law (Commercial Lease Early Termination Dispute)"),
             (r"\b(suit for accounts|partnership dissolution|court-appointed receiver.*audit|dissolution of partnership|partnership deed.*dissolution)\b", "Indian Partnership Act, 1932 (Suit for Accounts & Dissolution of Partnership)"),
             
             # Family Law
@@ -214,6 +214,15 @@ class ScopedFactExtractor:
             (r"\b(sarfaesi|securiti[sz]ation|debts recovery tribunal|drt\b|section 17.*sarfaesi|possession notice.*auction)\b", "SARFAESI Act, 2002 (Section 17 Securitisation Application before DRT)"),
             (r"\b(revocation of project registration.*rera|diverted 70% of collections from escrow|rera section 7 revocation)\b", "Real Estate (Regulation and Development) Act, 2016 (Section 7 Registration Revocation)"),
             
+            # Additional Regulatory, Labour, Consumer, Civil & Writ Domains
+            (r"\b(civil declaratory suit|declaration of (?:ownership )?title|demolition notice|injunction against demolition|money suit|recovery of (?:an oral|unpaid) (?:personal )?loan|rent arrears and service charges|survey and boundaries act|relinquishment deed|cancellation of (?:registered )?relinquishment deed|mesne profits|order xx rule 12|mandatory injunction.*drainage|drainage passage|pre-emption.*hindu succession act|statutory right of pre-emption|fiduciary capacity)\b", "Civil Property & Declaratory Law (Suit for Title / Injunction / Mesne Profits)"),
+            (r"\b(claiming monthly maintenance|maintenance for herself and|paternity and legitimacy|child born during wedlock)\b", "Family Law (CrPC Section 125 / Hindu Succession / Paternity)"),
+            (r"\b(consumer complaint|consumer forum|deficiency of service|district commission|state commission.*defective|unauthorized international roaming|lost parcel|flight cancellation|diagnostic laboratory|false positive pathology|courier company.*deficiency)\b", "Consumer Protection Act, 2019 (Consumer Dispute / Deficiency of Service)"),
+            (r"\b(employees'? compensation act|commissioner for employees'? compensation|employees'? provident fund|epf.*section 7a|certified standing orders|standing orders|payment of gratuity act|gratuity act)\b", "Labour Law (Employees' Compensation / EPF / Gratuity / Standing Orders)"),
+            (r"\b(rfctlarr act|section 64.*(?:rfctlarr|land acquisition)|facial recognition cameras.*privacy|waste management.*pil|municipal solid waste|open garbage landfill|landfill polluting|pil before the high court|state administrative tribunal|punitive transfer|rte act|right to education act|25% admission|town planning act|building setback|scrutiny committee|community certificate.*cancellation|essential services maintenance act|esma\b|academic suspension|proctorial board)\b", "Constitutional, Administrative & Service Law (Writ / PIL / Tribunal Challenge)"),
+            (r"\b(civil suit.*copyright act|copyright act.*civil suit)\b", "Intellectual Property Law (Copyright Act, 1957 - Civil Suit)"),
+            (r"\b(section 9.*ibc|nclt\b.*(?:operational|insolvency)|operational vendor.*nclt)\b", "Insolvency and Bankruptcy Code, 2016 (NCLT Section 9 Operational CIRP)"),
+
             # Regulatory Tribunals
             (r"\b(tdsat|telecom disputes settlement|interconnection agreement|spectrum usage charges)\b", "Telecom Disputes Settlement and Appellate Tribunal (TDSAT Regulatory Dispute)"),
             (r"\b(cestat|customs duty.*valuation|classification of imported|excise tariff appeal)\b", "Customs, Excise and Service Tax Appellate Tribunal (CESTAT Tariff Appeal)"),
@@ -486,11 +495,12 @@ class ScopedFactExtractor:
 
         # House-breaking & Theft in Dwelling
         is_dwelling = bool(re.search(r"\b(residential house|dwelling house|locked house|inside the (?:house|building|flat|apartment)|human dwelling)\b", lower))
-        is_housebreaking_match = bool(re.search(r"\b(broke\s+(?:the\s+)?(?:rear\s+|front\s+)?window|house-breaking|lurking\s+house-trespass|entered\s+through\s+(?:the\s+)?window|broke\s+open\s+the\s+door|house\s+trespass\s+by\s+night)\b", lower))
+        is_housebreaking_match = bool(re.search(r"\b(section 457\b|broke\s+(?:open\s+)?(?:the\s+)?(?:rear\s+|front\s+)?(?:window|door)|house-breaking|house\s+breaking|lurking\s+house-trespass|entered\s+through\s+(?:the\s+)?window|broke\s+open\s+the\s+door|house[- ]trespass\s+by\s+night)\b", lower))
         if is_housebreaking_match:
             is_housebreaking = True
             tokens.append("house_breaking_or_lurking_house_trespass_by_night")
-        if is_dwelling and (stole_property or bool(re.search(r"\b(laptop|gold|ornaments|belongings|valuables)\b", lower))):
+            tokens.append("intention_to_commit_theft_or_offence")
+        if is_dwelling and (stole_property or bool(re.search(r"\b(laptop|gold|ornaments|belongings|valuables)\b", lower))) and not is_housebreaking:
             is_theft_in_dwelling = True
             tokens.append("building_tent_or_vessel_used_as_human_dwelling")
 
@@ -502,7 +512,7 @@ class ScopedFactExtractor:
             if injury_severity in ("Simple", "Grievous") or bool(re.search(r"\b(robbery with hurt|struck.*causing.*injur|stabbed.*robbed|voluntarily caus\w* hurt|knife causing bleeding|slashed.*knife)\b", lower)):
                 is_robbery_with_hurt = True
                 tokens.append("voluntarily_causing_hurt")
-        elif (stole_property or is_theft_in_dwelling) and not force_exerted and not weapon_used and not is_trespass:
+        elif (stole_property or is_theft_in_dwelling) and not force_exerted and not weapon_used and not is_trespass and not is_housebreaking:
             is_theft = True
             tokens.append("dishonest_theft_taking")
 
@@ -677,7 +687,7 @@ class ScopedFactExtractor:
             tokens.append("demand_for_ransom")
 
         # --- 17. Cyber Phishing / Personation (Section 66D IT Act / Section 318(4) BNS) ---
-        cyber_match = bool(re.search(r"\b(phishing|cheating by personation|cyber fraud|unauthorized otp|(?:impersonat\w*|claimed to be|falsely representing himself as)\s+(?:a\s+)?(?:senior\s+|credit card\s+)?(?:bank|banking|customer care)\s+(?:official|representative|executive|manager|agent)|fake netbanking portal|remote (?:access|screen-sharing) (?:app|application)|fake customer care|sharing (?:their )?otps?|tricked into sharing.*otp|online financial fraud|cybercrime|digital forensics.*ip address|unauthorized (?:transactions|withdrawals?|transfers?|electronic transactions?)|confidential (?:banking|internet banking)\s+(?:information|passwords?)|spoofed (?:banking|internet banking|website|portal)|kyc (?:update|verification)|two-factor authentication|credit card details and otp|computer resource and digital identity deception|impersonating.*?requested confidential banking)\b", lower))
+        cyber_match = bool(re.search(r"\b(phishing|cheating by personation (?:by|using) (?:computer|communication device)|cyber fraud|unauthorized otp|(?:impersonat\w*|claimed to be|falsely representing himself as)\s+(?:a\s+)?(?:senior\s+|credit card\s+)?(?:bank|banking|customer care)\s+(?:official|representative|executive|manager|agent)|fake netbanking portal|remote (?:access|screen-sharing) (?:app|application)|fake customer care|sharing (?:their )?otps?|tricked into sharing.*otp|online financial fraud|cybercrime|digital forensics.*ip address|unauthorized (?:transactions|withdrawals?|transfers?|electronic transactions?)|confidential (?:banking|internet banking)\s+(?:information|passwords?)|spoofed (?:banking|internet banking|website|portal)|kyc (?:update|verification)|two-factor authentication|credit card details and otp|computer resource and digital identity deception|impersonating.*?requested confidential banking)\b", lower))
         if cyber_match and not weapon_used and not death_caused:
             is_cyber_phishing = True
             tokens.append("cheating_by_personation")
@@ -731,12 +741,14 @@ class ScopedFactExtractor:
             tokens.append("monitors_the_use_by_a_woman_of_the_internet_email_or_electronic_communication")
 
         # --- 24. Causing Disappearance of Evidence / Screening Offender (Section 201 IPC / Section 238 BNS) ---
-        evidence_destr_match = bool(re.search(r"\b(section 201\b|section 238 bns|disappearance of evidence|destruction of evidence|screen(?:ed|ing)? the offender|threw the weapon into (?:canal|river)|washed away bloodstains|burned the clothes to destroy evidence|wiped fingerprints|buried the body to conceal|concealed evidence of offence)\b", lower))
-        if evidence_destr_match and not death_caused:
+        evidence_destr_match = bool(re.search(r"\b(section 201\b|section 238 bns|disappearance of evidence|destruction of evidence|screen(?:ed|ing)? the offender|threw the weapon into (?:canal|river)|threw the blood-stained .*into a canal|washed away bloodstains|burned (?:his|her|the)?\s*clothes to destroy evidence|wiped fingerprints|buried the body to conceal|concealed evidence of offence)\b", lower))
+        if evidence_destr_match:
             is_destruction_of_evidence = True
             tokens.append("causing_evidence_of_offence_to_disappear")
             tokens.append("intention_of_screening_offender_from_legal_punishment")
             tokens.append("giving_false_information_respecting_offence")
+            if bool(re.search(r"\b(section 201\b|destruction of evidence|screen(?:ing)? the offender)\b", lower)) and not bool(re.search(r"\b(accused.*(?:fatally stabbed|stabbed the victim|caused (?:the )?death|murdered))\b", lower)):
+                death_caused = False
 
         # --- 25. Counterfeiting Currency Notes FICN (Section 489A IPC / Section 178 BNS) ---
         ficn_match = bool(re.search(r"\b(section 489a\b|section 178 bns|counterfeiting currency|counterfeit (?:currency|banknotes?|notes)|fake indian currency notes?|ficn|printing fake currency|high quality counterfeit notes|counterfeiting process|counterfeit notes of.*denomination)\b", lower))
@@ -778,7 +790,7 @@ class ScopedFactExtractor:
             tokens.append("dishonest_retention_or_receipt")
 
         # --- 30. Cheating by Personation (Section 419 IPC / Section 319 BNS) ---
-        cheating_personation_match = bool(re.search(r"\b(section 419\b|section 319 bns|cheating by (?:impersonation|personation)|posing as (?:an? )?(?:ias|ips|police officer|cbi|judge|government officer|officer)|pretended to be.*officer|alias and forged credentials.*plot allotment|obtained.*allotment.*posing as)\b", lower))
+        cheating_personation_match = bool(re.search(r"\b(section 419\b|section 319 bns|cheating by (?:impersonation|personation)|posing as (?:an? )?(?:ias|ips|police officer|cbi|judge|government officer|officer)|pretended to be.*officer|alias and forged credentials.*plot allotment|obtained.*allotment.*posing as|pretending to be the actual candidate|false hall ticket|taking the offline written test|proxy examinee)\b", lower))
         if cheating_personation_match and not death_caused and not is_extortion and not is_cyber_phishing:
             is_cheating_personation = True
             tokens.append("cheating_by_personation")
