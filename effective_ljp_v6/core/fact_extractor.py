@@ -392,7 +392,7 @@ class ScopedFactExtractor:
 
         # --- 3. Premeditation, Intent & Sudden Fight (Fix F-04) ---
         negated_premed = bool(re.search(r"\b(no (?:prior )?(?:enmity|animosity|planning|ill-will)|not planned|unpremeditated|without (?:any )?(?:premeditation|planning|prior (?:enmity|planning))|no long-standing grudge|unscripted argument)\b", lower))
-        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|electoral grudge|long-standing (?:land |property |boundary )?dispute|over a (?:long-standing|boundary|property) dispute|threatened revenge|planned in advance|planned the murder|made a plan|lying in wait|waited for the victim|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|hired (?:two |three )?(?:sharpshooters|contract killers|hitmen)|contract (?:killing|shooters?|hit)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun|pesticide|poison|in advance)|lured.*to (?:eliminate|an abandoned|isolated|warehouse)|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison|pesticide)|honor killing|deep rancor|rancor|stalked.*(?:victim|deceased|complainant)|decapitat\w*|procured.*(?:machete|knife|weapon|pistol|gun|axe|talwar|crowbar))\b", lower))
+        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|electoral grudge|long-standing (?:land |property |boundary )?dispute|over a (?:long-standing|boundary|property) dispute|dispute\b.*?\bfor (?:several|multiple|\d+)\s*(?:weeks?|months?|years?)|financial dispute|dispute over (?:a )?financial transaction|intentionally caused (?:the )?(?:victim'?s?|deceased'?s?|his|her)?\s*death|threatened revenge|planned in advance|planned the murder|made a plan|lying in wait|waited for the victim|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|hired (?:two |three )?(?:sharpshooters|contract killers|hitmen)|contract (?:killing|shooters?|hit)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun|pesticide|poison|in advance)|lured.*to (?:eliminate|an abandoned|isolated|warehouse)|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison|pesticide)|honor killing|deep rancor|rancor|stalked.*(?:victim|deceased|complainant)|decapitat\w*|procured.*(?:machete|knife|weapon|pistol|gun|axe|talwar|crowbar))\b", lower))
 
         if positive_premed and not negated_premed:
             has_premeditation = True
@@ -401,7 +401,7 @@ class ScopedFactExtractor:
             has_premeditation = False
 
         sudden_quarrel = bool(re.search(r"\b(sudden (?:quarrel|fight|altercation|argument|spat|fit of rage|fit of anger)|road rage(?: altercation)?|altercation|physical altercation|heat of passion|hot blood|hot words|spontaneous (?:fight|altercation)|impromptu.*(?:brawl|quarrel|fight)|during an argument|unscripted argument|in a sudden quarrel)\b", lower))
-        if sudden_quarrel or negated_premed:
+        if (sudden_quarrel or negated_premed) and not has_premeditation:
             is_sudden_fight = True
             heat_of_passion = True
             tokens.append("sudden_fight_heat_of_passion")
@@ -410,7 +410,7 @@ class ScopedFactExtractor:
         is_negligence = bool(re.search(r"\b(rash|negligent|criminal negligence|excessive speed|high speed|speed was well above the limit|speeding|struck (?:a )?pedestrian|hit (?:a )?pedestrian|vehicular accident|reckless driving|failing to exercise reasonable care|hit and run|traffic collision|careless driving|lost control while (?:overtaking|driving|turning)|lorry driver|truck driver|bus driver|motor vehicle)\b", lower))
 
         if death_caused:
-            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|pesticide|laced.*(?:coffee|tea|flask|drink|food)|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck|(?:blunt force |fatal |severe )?injuries to the (?:skull|head)|skull fracture|fractured (?:the )?skull)\b", lower))
+            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|pesticide|laced.*(?:coffee|tea|flask|drink|food)|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck|(?:blunt force |fatal |severe |serious )?injuries to the (?:skull|head|chest|heart|neck)|skull fracture|fractured (?:the )?skull|attacked.*injuries to.*(?:chest|heart|throat|neck|head))\b", lower))
             if (has_premeditation or lethal_vital_attack) and not is_sudden_fight and not is_provocation:
                 intention_to_cause_death = True
                 tokens.append("intention_to_cause_death")
@@ -444,7 +444,7 @@ class ScopedFactExtractor:
 
         # Criminal Trespass Scoping (Entering fenced property/land without permission by accused)
         victim_trespassed = bool(re.search(r"\b(deceased|victim|complainant)\b[^.!?]*\b(trespass\w*|entered)\b", lower))
-        is_trespass = bool(re.search(r"\b(entered\s+(?:the\s+)?(?:complainant|victim|owner|private)[\"']?s?\s+(?:fenced\s+|private\s+)?(?:property|land|house|premises|compound|boundary|field)\s+without\s+(?:permission|authorization)|unlawfully\s+entered|remained\s+there\s+despite\s+being\s+instructed\s+to\s+leave|refused\s+to\s+vacate|jumped\s+(?:the\s+)?(?:perimeter\s+|boundary\s+)?(?:wall|fence)|criminal\s+trespass|trespassed|entered\s+(?:the\s+)?(?:fenced\s+)?property\s+without\s+(?:permission|authorization))\b", lower)) and not victim_trespassed and not death_caused
+        is_trespass = bool(re.search(r"\b(entered\s+(?:the\s+)?(?:complainant|victim|owner|private)[\"']?s?\s+(?:fenced\s+|private\s+)?(?:property|land|house|premises|compound|boundary|field)\s+without\s+(?:permission|authorization)|entered\s+(?:the\s+)?(?:fenced\s+|private\s+)?(?:property|land|plot|premises)\s+without\s+(?:the\s+owner'?s?\s+)?(?:permission|authorization)|entered\s+and\s+remained\s+on\s+the\s+property|unlawfully\s+entered|remained\s+there\s+despite\s+being\s+(?:instructed|asked)\s+to\s+leave|refused\s+to\s+vacate|jumped\s+(?:the\s+)?(?:perimeter\s+|boundary\s+)?(?:wall|fence)|criminal\s+trespass|trespassed|intention\s+of\s+intimidating\s+or\s+annoying\s+the\s+owner)\b", lower)) and not victim_trespassed and not death_caused
         if is_trespass:
             is_criminal_trespass = True
             tokens.append("unlawful_entry_into_or_upon_property")
@@ -490,7 +490,7 @@ class ScopedFactExtractor:
             fraudulent_inducement_at_inception = True
             tokens.append("fraudulent_inducement_cheating")
 
-        forgery_terms = bool(re.search(r"\b(forged|forgery|fake document|false (?:property |title |sale |official )?document|counterfeit|manufactured (?:deed|document)|tampered (?:title deed|document)|false seal|fabricated\s+(?:a\s+)?(?:false\s+|forged\s+)?(?:death certificate|will|title deed|property document|power of attorney|document)|imitating\s+(?:the\s+)?signature|forged\s+signature|fake\s+signature|discrepancies\s+in\s+(?:the\s+)?signature|fabricated\s+a\s+forged)\b", lower))
+        forgery_terms = bool(re.search(r"\b(forged|forgery|fake document|false (?:property |property ownership |ownership |title |sale |official )?document|counterfeit|manufactured (?:deed|document)|tampered (?:title deed|document)|false seal|fabricated\s+(?:a\s+)?(?:false\s+|forged\s+)?(?:death certificate|will|title deed|property document|power of attorney|document)|reproduc\w*\s+(?:the\s+)?signature|document\s+(?:had been|was)\s+fabricated|imitating\s+(?:the\s+)?signature|forged\s+signature|fake\s+signature|discrepancies\s+in\s+(?:the\s+)?signature|fabricated\s+a\s+forged)\b", lower))
         if forgery_terms:
             is_forgery = True
             tokens.append("forged_document_fabricated")
@@ -681,7 +681,7 @@ class ScopedFactExtractor:
             tokens.append("intent_to_cause_destruction_of_house_or_place_of_worship_or_custody_of_property")
 
         # --- 22. Kidnapping from Lawful Guardianship (Section 363 IPC / Section 137(2) BNS) ---
-        kidnap_minor_match = bool(re.search(r"\b(section 363\b|section 137\(2\)|kidnapped.*minor|enticed.*minor|out of the keeping of.*(?:lawful guardian|parents|father|mother)|kidnapped from school.*without.*ransom|without the consent of.*guardian|taken away.*minor girl|enticed away a (?:14|15|16|17|child|minor))\b", lower))
+        kidnap_minor_match = bool(re.search(r"\b(section 363\b|section 137\(2\)|kidnapping\s+(?:from\s+)?lawful\s+guardianship|kidnapp\w*.*?(?:minor|child|boy|girl)|enticed.*minor|out of the keeping of.*(?:lawful guardian|parents|father|mother)|kidnapped from school.*without.*ransom|without the consent of.*guardian|(?:not\s+authori[zs]ed|without\s+(?:the\s+)?consent)\s+(?:by|of)\s+(?:the\s+)?(?:child'?s?|minor'?s?)\s+guardians?|left\s+with\s+an\s+adult\s+who\s+was\s+not\s+authori[zs]ed|taken away.*(?:minor|child)|enticed away a (?:14|15|16|17|child|minor))\b", lower))
         if kidnap_minor_match and not is_kidnapping_ransom and not death_caused:
             is_kidnapping_lawful_guardian = True
             tokens.append("taking_or_enticing_minor_or_unsound_mind")

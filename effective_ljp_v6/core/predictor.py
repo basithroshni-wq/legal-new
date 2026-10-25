@@ -82,11 +82,14 @@ class CalibratedLegalPredictor:
             elif facts.injury_severity == "Simple" and not facts.weapon_used and cand.id == "STAT_323_IPC" and not facts.death_caused:
                 z += 0.50
 
-            if facts.is_intimidation and cand.id == "STAT_506_IPC" and not facts.is_robbery and not facts.is_sexual_offence and not facts.death_caused:
+            if facts.is_intimidation and cand.id == "STAT_506_IPC" and not facts.is_robbery and not facts.is_sexual_offence and not facts.death_caused and not getattr(facts, "is_criminal_trespass", False):
                 z += 0.60
 
-            if getattr(facts, "is_criminal_trespass", False) and cand.id == "STAT_447_IPC":
-                z += 0.70
+            if getattr(facts, "is_criminal_trespass", False):
+                if cand.id == "STAT_447_IPC":
+                    z += 1.50
+                elif cand.id == "STAT_506_IPC":
+                    z -= 0.60
 
             if facts.is_dacoity:
                 if cand.id == "STAT_395_IPC":
@@ -101,7 +104,10 @@ class CalibratedLegalPredictor:
                 z += 0.60
 
             if facts.is_forgery and cand.id in ("STAT_468_IPC", "STAT_471_IPC"):
-                z += 0.60
+                if facts.is_fraud_or_cheating and cand.id == "STAT_468_IPC":
+                    z += 1.20
+                else:
+                    z += 0.60
             elif facts.is_breach_of_trust:
                 if getattr(facts, "is_breach_of_trust_clerk_servant", False) and cand.id == "STAT_408_IPC":
                     z += 1.20

@@ -616,13 +616,13 @@ class ScopedFactExtractor:
 
         # 4. Premeditation & Sudden Fight (Fix F-04)
         negated_premed = bool(re.search(r"\b(no (?:prior )?(?:enmity|animosity|planning|ill-will)|not planned|unpremeditated|without (?:any )?(?:premeditation|planning|prior (?:enmity|planning))|no long-standing grudge|unscripted argument)\b", lower))
-        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|threatened revenge|planned in advance|planned the murder|made a plan|lying in wait|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun|pesticide|poison|in advance)|lured.*to eliminate|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison|pesticide)|honor killing)\b", lower))
+        positive_premed = bool(re.search(r"\b(premeditat\w*|prior enmity|long-standing grudge|bitter grudge|grudge over|electoral grudge|long-standing (?:land |property |boundary )?dispute|over a (?:long-standing|boundary|property) dispute|dispute\b.*?\bfor (?:several|multiple|\d+)\s*(?:weeks?|months?|years?)|financial dispute|dispute over (?:a )?financial transaction|intentionally caused (?:the )?(?:victim'?s?|deceased'?s?|his|her)?\s*death|threatened revenge|planned in advance|planned the murder|made a plan|lying in wait|waited for the victim|ambush\w*|hid behind.*armed with|conspir\w* to (?:eliminate|murder|kill)|purchased.*(?:crowbar|hammer|weapon|knife|pistol|gun|pesticide|poison|in advance)|lured.*to eliminate|tailed.*deceased|administered (?:potassium cyanide|cyanide|arsenic|poison|pesticide)|honor killing)\b", lower))
         has_premeditation = positive_premed and not negated_premed
         if has_premeditation:
             tokens.append("premeditation_established")
 
         sudden_quarrel = bool(re.search(r"\b(sudden (?:quarrel|fight|altercation|argument|spat|fit of rage|fit of anger)|heat of passion|hot blood|hot words|spontaneous (?:fight|altercation)|impromptu.*(?:brawl|quarrel|fight)|during an argument|unscripted argument|in a sudden quarrel)\b", lower))
-        is_sudden_fight = sudden_quarrel or negated_premed
+        is_sudden_fight = (sudden_quarrel or negated_premed) and not has_premeditation
         if is_sudden_fight:
             tokens.append("sudden_fight_heat_of_passion")
 
@@ -631,7 +631,7 @@ class ScopedFactExtractor:
         is_criminal_negligence = False
 
         if death_caused:
-            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|pesticide|laced.*(?:coffee|tea|flask|drink|food)|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed)\b", lower))
+            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|pesticide|laced.*(?:coffee|tea|flask|drink|food)|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck|(?:blunt force |fatal |severe |serious )?injuries to the (?:skull|head|chest|heart|neck)|skull fracture|fractured (?:the )?skull|attacked.*injuries to.*(?:chest|heart|throat|neck|head))\b", lower))
             if (has_premeditation or lethal_vital_attack) and not is_sudden_fight and not is_provocation:
                 tokens.append("intention_to_cause_death")
             elif is_sudden_fight:
@@ -660,7 +660,7 @@ class ScopedFactExtractor:
 
         # Criminal Trespass Scoping (Entering fenced property without permission by accused)
         victim_trespassed = bool(re.search(r"\b(deceased|victim|complainant)\b[^.!?]*\b(trespass\w*|entered)\b", lower))
-        is_trespass = bool(re.search(r"\b(entered\s+(?:the\s+)?(?:complainant|victim|owner|private)[\"']?s?\s+(?:fenced\s+|private\s+)?(?:property|land|house|premises|compound|boundary|field)\s+without\s+permission|unlawfully\s+entered|remained\s+there\s+despite\s+being\s+instructed\s+to\s+leave|criminal\s+trespass|trespassed|entered\s+(?:the\s+)?(?:fenced\s+)?property\s+without\s+permission)\b", lower)) and not victim_trespassed and not death_caused
+        is_trespass = bool(re.search(r"\b(entered\s+(?:the\s+)?(?:complainant|victim|owner|private)[\"']?s?\s+(?:fenced\s+|private\s+)?(?:property|land|house|premises|compound|boundary|field)\s+without\s+permission|entered\s+(?:the\s+)?(?:fenced\s+|private\s+)?(?:property|land|plot|premises)\s+without\s+(?:the\s+owner'?s?\s+)?(?:permission|authorization)|entered\s+and\s+remained\s+on\s+the\s+property|unlawfully\s+entered|remained\s+there\s+despite\s+being\s+(?:instructed|asked)\s+to\s+leave|refused\s+to\s+vacate|jumped\s+(?:the\s+)?(?:perimeter\s+|boundary\s+)?(?:wall|fence)|criminal\s+trespass|trespassed|intention\s+of\s+intimidating\s+or\s+annoying\s+the\s+owner)\b", lower)) and not victim_trespassed and not death_caused
         is_criminal_trespass = is_trespass
         if is_trespass:
             tokens.append("unlawful_entry_into_or_upon_property")
@@ -690,7 +690,7 @@ class ScopedFactExtractor:
         if is_fraud:
             tokens.append("fraudulent_inducement_cheating")
 
-        is_forgery = bool(re.search(r"\b(forged|forgery|fake document|false (?:property |title |sale |official )?document|counterfeit|manufactured (?:deed|document)|tampered (?:title deed|document)|false seal|fabricated\s+(?:a\s+)?(?:false\s+|forged\s+)?(?:death certificate|will|title deed|property document|power of attorney|document)|imitating\s+(?:the\s+)?signature|forged\s+signature|fake\s+signature|discrepancies\s+in\s+(?:the\s+)?signature|fabricated\s+a\s+forged)\b", lower))
+        is_forgery = bool(re.search(r"\b(forged|forgery|fake document|false (?:property |property ownership |ownership |title |sale |official )?document|counterfeit|manufactured (?:deed|document)|tampered (?:title deed|document)|false seal|fabricated\s+(?:a\s+)?(?:false\s+|forged\s+)?(?:death certificate|will|title deed|property document|power of attorney|document)|reproduc\w*\s+(?:the\s+)?signature|document\s+(?:had been|was)\s+fabricated|imitating\s+(?:the\s+)?signature|forged\s+signature|fake\s+signature|discrepancies\s+in\s+(?:the\s+)?signature|fabricated\s+a\s+forged)\b", lower))
         if is_forgery:
             tokens.append("forged_document_fabricated")
 
