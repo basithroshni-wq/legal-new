@@ -103,7 +103,7 @@ class ScopedFactExtractor:
         corp_matches = sum(1 for phrase in corporate_finance if phrase in lower)
 
         # Check explicit non-penal civil / constitutional / family / labour / commercial / administrative litigation first
-        has_active_crime = bool(re.search(r"\b(charged with (?:murder|rape|theft|robbery|dacoity|cheating|forgery)|fir registered|fir lodged|chargesheet|arrested for (?:murder|rape|theft|robbery|dacoity)|criminal complaint alleging (?:cheating|breach)|penal code|bns 2023|ipc 1860|indian penal code)\b", lower))
+        has_active_crime = bool(re.search(r"\b(charged with (?:murder|rape|theft|robbery|dacoity|cheating|forgery|kidnapping)|kidnapp\w*|fir registered|fir lodged|chargesheet|arrested for (?:murder|rape|theft|robbery|dacoity|kidnapping)|criminal complaint alleging (?:cheating|breach)|penal code|bns 2023|ipc 1860|indian penal code)\b", lower))
         
         non_penal_domains = [
             # Contract & Property Law
@@ -123,11 +123,11 @@ class ScopedFactExtractor:
             # Family Law
             (r"\b(mutual consent|dissolution of marriage|section 13b|hindu marriage act.*13b|alimony|mutually agreed to divorce|divorce petition|suit for divorce|decree of divorce|filed for divorce|seeking divorce)\b", "Hindu Marriage Act, 1955 (Section 13B Mutual Consent Divorce & Alimony)"),
             (r"\b(pwdva|protection order \(pwdva|domestic violence — protection order|shelter home with her two children|alienating the children|protection of women from domestic violence)\b", "Protection of Women from Domestic Violence Act, 2005 (PWDVA Application for Protection Order)"),
-            (r"\b(guardianship — nri|nri father.*guardianship|guardianship of his \d+-year-old|interviewed in chambers.*expressed a preference to stay with his mother)\b", "Guardians and Wards Act, 1890 (Child Custody and Guardianship Dispute)"),
+            (r"\b(guardians and wards act|petition under the guardians|guardianship petition|child custody|custody and visitation|visitation rights|paramount welfare of the minor|guardianship — nri|nri father.*guardianship|guardianship of his \d+-year-old|child custody dispute|parents.*divorcing.*custody|child psychologist.*custody)\b", "Guardians and Wards Act, 1890 (Child Custody and Guardianship Dispute)"),
             (r"\b(second wife'?s? claim|succession — intestate|disputed as bigamous|biological father of all children.*nominee in his insurance|dna testing confirms the man was the biological father)\b", "Indian Succession Act, 1925 / Hindu Succession Act (Intestate Succession & Second Wife's Claim)"),
             (r"\b(maintenance for major disabled child|cerebral palsy.*maintenance|disabled child.*section 125|maintenance from his estranged father under section 125)\b", "Family / Quasi-Civil Law (CrPC Section 125 - Maintenance for Adult Disabled Child)"),
             (r"\b(petitions for divorce|hindu marriage act section 13|divorce — cruelty|refused to cohabit)\b", "Family Law (Hindu Marriage Act Section 13 - Divorce Petition)"),
-            (r"\b(child custody dispute|parents.*divorcing.*custody|child psychologist.*custody)\b", "Family Law (Guardians and Wards Act - Child Custody Dispute)"),
+            (r"\b(child custody dispute|parents.*divorcing.*custody|child psychologist.*custody|custody of the minor child)\b", "Family Law (Guardians and Wards Act - Child Custody Dispute)"),
             (r"\b(maintenance \(crpc section 125\)|section 125 crpc|deserted by (?:her|his) husband|desertion|capable of earning.*mobility|limiting her mobility)\b", "Family / Quasi-Civil Law (CrPC Section 125 - Maintenance Claim)"),
             (r"\b(restitution of conjugal rights|hma section 9)\b", "Family Law (Hindu Marriage Act Section 9 - Restitution of Conjugal Rights)"),
             (r"\b(triple talaq.*iddat|muslim personal law.*maintenance during the iddat)\b", "Muslim Personal Law / Family Law (Maintenance Claim)"),
@@ -625,7 +625,7 @@ class ScopedFactExtractor:
             tokens.append("dishonest_inducement_to_deliver_property_or_valuable_security")
 
         # --- 15. Acid Attack (Section 326A IPC / Section 124(1) BNS) ---
-        acid_match = bool(re.search(r"\b(acid attack|threw acid|corrosive acid|facial disfigurement.*acid|vitriol)\b", lower))
+        acid_match = bool(re.search(r"\b(acid attack|threw\s+.*?\s*acid|threw\s+acid|concentrated\s+.*?\s*acid|corrosive\s+acid|acid.*facial\s+disfigurement|facial\s+disfigurement.*acid|vitriol|chemical\s+burns.*acid|section 326a\b)\b", lower))
         if acid_match:
             is_acid_attack = True
             tokens.append("throwing_or_administering_acid")
