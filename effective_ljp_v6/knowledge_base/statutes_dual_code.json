@@ -917,6 +917,157 @@
     ],
     "negative_exceptions": [],
     "legal_definition": "Whoever counterfeits, or knowingly performs any part of the process of counterfeiting, any currency-note or bank-note, shall be punished with imprisonment for life, or with imprisonment of either description for a term which may extend to ten years, and shall also be liable to fine under Section 489A IPC / Section 178 BNS."
+  },
+  {
+    "id": "STAT_147_IPC",
+    "ipc_section": "Section 147",
+    "bns_section": "Section 191(2)",
+    "statute_title": "Punishment for Rioting",
+    "charge_category": "Rioting & Unlawful Assembly",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 2,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "unlawful_assembly_five_plus",
+      "force_or_violence_used_by_assembly",
+      "prosecution_of_common_object"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever is guilty of rioting shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both under Section 147 IPC / Section 191(2) BNS."
+  },
+  {
+    "id": "STAT_149_IPC",
+    "ipc_section": "Section 149",
+    "bns_section": "Section 190",
+    "statute_title": "Every Member of Unlawful Assembly Guilty of Offence Committed in Prosecution of Common Object",
+    "charge_category": "Unlawful Assembly & Constructive Liability",
+    "statutory_ceiling_tier": "Tier 2 (3 to 7 Years)",
+    "statutory_max_years": 7,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "unlawful_assembly_five_plus",
+      "offence_committed_in_prosecution_of_common_object",
+      "member_of_assembly_at_time_of_committing"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "If an offence is committed by any member of an unlawful assembly in prosecution of the common object of that assembly, every person who, at the time of the committing of that offence, is a member of the same assembly, is guilty of that offence under Section 149 IPC / Section 190 BNS."
+  },
+  {
+    "id": "STAT_343_IPC",
+    "ipc_section": "Section 343",
+    "bns_section": "Section 127(3)",
+    "statute_title": "Wrongful Confinement for Three or More Days",
+    "charge_category": "Wrongful Confinement & Restraint",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 2,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "wrongful_restraint_or_confinement",
+      "confinement_preventing_proceeding_beyond_boundaries",
+      "confinement_for_three_or_more_days"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever wrongfully confines any person for three days, or more, shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both under Section 343 IPC / Section 127(3) BNS."
+  },
+  {
+    "id": "STAT_411_IPC",
+    "ipc_section": "Section 411",
+    "bns_section": "Section 317(2)",
+    "statute_title": "Dishonestly Receiving Stolen Property",
+    "charge_category": "Theft & Property Receiving",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 3,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "possession_of_stolen_property",
+      "knowing_or_having_reason_to_believe_to_be_stolen",
+      "dishonest_retention_or_receipt"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever dishonestly receives or retains any stolen property, knowing or having reason to believe the same to be stolen property, shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both under Section 411 IPC / Section 317(2) BNS."
+  },
+  {
+    "id": "STAT_419_IPC",
+    "ipc_section": "Section 419",
+    "bns_section": "Section 319",
+    "statute_title": "Punishment for Cheating by Personation",
+    "charge_category": "Cheating & Financial Fraud",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 3,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "cheating_by_personation",
+      "pretending_to_be_another_or_fictitious_person",
+      "dishonest_inducement_or_obtaining_property"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever cheats by personation shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both under Section 419 IPC / Section 319 BNS."
+  },
+  {
+    "id": "STAT_PCA_11",
+    "ipc_section": "Section 11 PCA Act",
+    "bns_section": "Section 11 PCA Act",
+    "statute_title": "Cruelty to Animals Generally",
+    "charge_category": "Special Penal / Animal Welfare",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 1,
+    "statutory_min_years": 0,
+    "is_cognizable": false,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "cruelty_to_animals",
+      "unnecessary_pain_or_suffering",
+      "inadequate_space_ventilation_or_confinement"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever treats any animal so as to subject it to unnecessary pain or suffering, or keeps any animal in any cage or other receptacle which does not permit the animal a reasonable opportunity for movement, commits an offence under Section 11 of the Prevention of Cruelty to Animals Act, 1960."
+  },
+  {
+    "id": "STAT_UAPA_10",
+    "ipc_section": "Section 10 UAPA",
+    "bns_section": "Section 10 UAPA",
+    "statute_title": "Penalty for Being Member of an Unlawful Association",
+    "charge_category": "Special Penal / Anti-Terrorism & National Security",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 2,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "membership_of_banned_or_unlawful_association",
+      "possession_of_propaganda_or_participation_in_meetings"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Whoever is and continues to be a member of an association which is declared unlawful under the Unlawful Activities (Prevention) Act, 1967 shall be punishable with imprisonment for a term which may extend to two years, and shall also be liable to fine under Section 10 UAPA."
+  },
+  {
+    "id": "STAT_WPA_51",
+    "ipc_section": "Section 51 Wildlife Protection Act",
+    "bns_section": "Section 51 Wildlife Protection Act",
+    "statute_title": "Penalties for Hunting, Poaching & Illegal Possession of Wildlife Trophies",
+    "charge_category": "Special Penal / Wildlife Protection",
+    "statutory_ceiling_tier": "Tier 2 (3 to 7 Years)",
+    "statutory_max_years": 7,
+    "statutory_min_years": 3,
+    "is_cognizable": true,
+    "is_bailable": false,
+    "essential_ingredients": [
+      "poaching_or_hunting_wild_animal",
+      "possession_of_animal_skins_claws_or_trophies",
+      "offence_in_tiger_reserve_or_sanctuary"
+    ],
+    "negative_exceptions": [],
+    "legal_definition": "Any person who contravenes any provision of the Wildlife (Protection) Act, 1972 relating to hunting or possession of trophies of Schedule I animals or offences committed in a tiger reserve shall be punishable with imprisonment for a term of not less than three years which may extend to seven years and fine under Section 51 Wildlife Protection Act."
   }
 ]
 

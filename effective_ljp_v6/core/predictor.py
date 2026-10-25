@@ -262,6 +262,56 @@ class CalibratedLegalPredictor:
                 else:
                     z -= 0.80
 
+            if getattr(facts, "is_rioting", False):
+                if cand.id == "STAT_147_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_unlawful_assembly", False):
+                if cand.id == "STAT_149_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_wrongful_confinement", False):
+                if cand.id == "STAT_343_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_stolen_property_possession", False):
+                if cand.id == "STAT_411_IPC":
+                    z += 2.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_cheating_personation", False):
+                if cand.id == "STAT_419_IPC":
+                    z += 2.00
+                elif cand.id == "STAT_468_IPC":
+                    z += 1.00
+                else:
+                    z -= 0.80
+
+            if getattr(facts, "is_cruelty_to_animals", False):
+                if cand.id == "STAT_PCA_11":
+                    z += 2.50
+                else:
+                    z -= 1.00
+
+            if getattr(facts, "is_uapa_offence", False):
+                if cand.id == "STAT_UAPA_10":
+                    z += 2.50
+                else:
+                    z -= 1.00
+
+            if getattr(facts, "is_wildlife_poaching", False):
+                if cand.id == "STAT_WPA_51":
+                    z += 2.50
+                else:
+                    z -= 1.00
+
             if facts.is_commercial_civil_dispute:
                 if cand.id == "STAT_CIVIL_482":
                     z += 1.50

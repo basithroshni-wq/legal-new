@@ -102,7 +102,7 @@ class ScopedFactExtractor:
         nature_matches = sum(1 for w in nature_words if w in lower)
         corp_matches = sum(1 for phrase in corporate_finance if phrase in lower)
 
-        has_active_crime = bool(re.search(r"\b(charged with (?:murder|rape|theft|robbery|dacoity|cheating|forgery|kidnapping)|kidnapp\w*|fir registered|fir lodged|chargesheet|arrested for (?:murder|rape|theft|robbery|dacoity|kidnapping)|criminal complaint alleging (?:cheating|breach)|quash\w*|section 482\b|section 528 bnss|penal code|bns 2023|ipc 1860|indian penal code)\b", lower))
+        has_active_crime = bool(re.search(r"\b(charged with (?:murder|rape|theft|robbery|dacoity|cheating|forgery|kidnapping)|kidnapp\w*|fir registered|fir lodged|chargesheet|arrested for (?:murder|rape|theft|robbery|dacoity|kidnapping)|criminal complaint alleging (?:cheating|breach)|quash\w*|section 482\b|section 528 bnss|penal code|bns 2023|ipc 1860|indian penal code|stalk\w*|following her|appearing outside her residence|rioting|wrongful confinement|locked his tenant inside|drag racing|uapa\b|unlawful activities|cruelty to animals|wildlife protection|poaching|stolen property|unlawful assembly|burned the crops|caste-based violence|fatally stabbing)\b", lower))
         
         non_penal_domains = [
             # Contract & Property Law
@@ -118,6 +118,10 @@ class ScopedFactExtractor:
             (r"\b(adverse possession|continuous and uninterrupted possession.*pucca structure|suit for recovery of possession)\b", "Civil Property Law (Suit based on Adverse Possession)"),
             (r"\b(rent control|eviction petition|vacant possession|tenant.*eviction|landlord.*eviction|bona fide.*necessity|rent-controlled tenancy|landlord seeks eviction)\b", "Rent Control Legislation (Landlord-Tenant Eviction)"),
             (r"\b(mortgage foreclosure|sarfaesi proceedings|housing loan.*defaulted)\b", "Banking & SARFAESI Act, 2002 (Mortgage Foreclosure)"),
+            (r"\b(benami transaction|benami property|prohibition of benami property transactions act|purchased from.*funds.*benami)\b", "Benami Transactions (Prohibition) Act, 1988 (Suit for Declaration of Title / Benami Property)"),
+            (r"\b(technology transfer agreement|source code transfer|proprietary ai software code|proprietary software code|seeks specific performance and damages)\b", "Specific Relief Act, 1963 / Contract Law (Specific Performance of Technology Transfer Agreement)"),
+            (r"\b(commercial lease termination|terminated a \d+-year lease|lease of a showroom|interior fit-outs|compensation for fit-outs|early termination of lease)\b", "Commercial Property & Contract Law (Commercial Lease Early Termination Dispute)"),
+            (r"\b(suit for accounts|partnership dissolution|court-appointed receiver.*audit|dissolution of partnership|partnership deed.*dissolution)\b", "Indian Partnership Act, 1932 (Suit for Accounts & Dissolution of Partnership)"),
             
             # Family Law
             (r"\b(mutual consent|dissolution of marriage|section 13b|hindu marriage act.*13b|alimony|mutually agreed to divorce|divorce petition|suit for divorce|decree of divorce|filed for divorce|seeking divorce)\b", "Hindu Marriage Act, 1955 (Section 13B Mutual Consent Divorce & Alimony)"),
@@ -130,6 +134,9 @@ class ScopedFactExtractor:
             (r"\b(maintenance \(crpc section 125\)|section 125 crpc|deserted by (?:her|his) husband|desertion|capable of earning.*mobility|limiting her mobility)\b", "Family / Quasi-Civil Law (CrPC Section 125 - Maintenance Claim)"),
             (r"\b(restitution of conjugal rights|hma section 9)\b", "Family Law (Hindu Marriage Act Section 9 - Restitution of Conjugal Rights)"),
             (r"\b(triple talaq.*iddat|muslim personal law.*maintenance during the iddat)\b", "Muslim Personal Law / Family Law (Maintenance Claim)"),
+            (r"\b(hindu adoptions and maintenance act|hama\b|adoption deed|adoptive parents|adoption dispute|reclaim custody.*adoption deed)\b", "Hindu Adoptions and Maintenance Act, 1956 (Adoption Validity & Custody Dispute)"),
+            (r"\b(mahr|dower|nikahnama|muslim personal law.*(?:mahr|dower)|suit for recovery of.*mahr)\b", "Muslim Personal Law (Suit for Recovery of Mahr / Dower)"),
+            (r"\b(succession dispute.*biological son|dna test.*biological father|legitimacy of child.*dna|chain of custody.*dna sample|paternity dispute.*succession)\b", "Indian Evidence Act / Succession Law (Legitimacy of Child & DNA Paternity Dispute)"),
             
             # Consumer & Labour Law
             (r"\b(builder delay \(rera\)|possession was not given until.*delay of \d+ months|promised possession by.*rera registration|rera|real estate regulatory authority|delayed possession.*builder|refund of flat booking.*rera|possession delay.*rera)\b", "Real Estate (Regulation and Development) Act, 2016 (RERA Consumer Delay Claim)"),
@@ -141,7 +148,10 @@ class ScopedFactExtractor:
             (r"\b(medical negligence|routine appendectomy.*surgical sponge|surgical count record)\b", "Consumer Protection Act, 2019 (Medical Negligence Complaint)"),
             (r"\b(employee'?s? compensation|workm[ae]n'?s? compensation|commissioner for workmen|machine crush injury|industrial.*compensation|lost.*fingers.*machine)\b", "Labour Law (Employees' Compensation Act, 1923)"),
             (r"\b(industrial disputes? act|labour court|industrial tribunal|unfair labour practice|wrongful termination|reinstatement with full back wages|trade union challenged|permanent employee.*restructuring.*domestic inquiry)\b", "Labour Law (Industrial Disputes Act, 1947)"),
+            (r"\b(retrenchment without compensation|retrenched \d+ workers|seasonal contract workers, not permanent employees|deemed permanent employees under the id act)\b", "Labour Law (Industrial Disputes Act, 1947 - Illegal Retrenchment Dispute)"),
             (r"\b(consumer commission|district consumer|consumer protection act|e-commerce defective product|defective goods|defective electronics|defective product|refrigerator online.*stopped working|warranty card guaranteed)\b", "Consumer Protection Act, 2019 (Defective Goods Complaint)"),
+            (r"\b(consumer complaint — spurious medicines|pharmacist sold medicines.*substandard|spurious medicines|central drugs laboratory|drugs and cosmetics act.*substandard|substandard.*batch number not traceable)\b", "Consumer Protection Act, 2019 / Drugs & Cosmetics Act (Spurious Medicines Consumer Claim)"),
+            (r"\b(maternity benefit denial|maternity benefit act|maternity leave.*teacher|completed the required 80 working days)\b", "Labour Law (Maternity Benefit Act, 1961 - Maternity Benefit Denial Dispute)"),
             
             # Constitutional & Public Law
             (r"\b(aadhaar linkage|mandating aadhaar linkage for receiving pension|biometric authentication failures|right to privacy under article 21.*aadhaar)\b", "Constitutional Law (Article 226/32 Writ - Aadhaar Linkage & Privacy under Art. 21)"),
@@ -152,32 +162,44 @@ class ScopedFactExtractor:
             (r"\b(writ of mandamus|rti applicant|public information officer|central information commission)\b", "Constitutional / Administrative Law (Writ of Mandamus - RTI Act, 2005)"),
             (r"\b(service law|promotion dispute|departmental promotion committee|superseded for promotion)\b", "Service Jurisprudence (Article 226 - Public Employment Promotion Dispute)"),
             (r"\b(writ for pollution control|state pollution control board|untreated effluent into a nearby river)\b", "Environmental Law (Article 226/32 PIL - Water Pollution Control)"),
+            (r"\b(intermediary under the it act|online platform liability|intermediary liability|takedown requests|user-generated content.*immunity|safe habo(?:u)?r.*intermediary)\b", "Information Technology Act, 2000 (Section 79 Intermediary Liability PIL)"),
+            (r"\b(obc sub-classification|sub-quota.*obc|reservation policy.*sub-classifying|article 14.*reservation|quota.*backward sub-groups)\b", "Constitutional Law (Article 14/15/16 - OBC Sub-Classification & Affirmative Action Policy)"),
+            (r"\b(pil.*open defecation|open defecation in urban slum|community toilets.*notified slum|sanitation had allocated funds that were not utilised)\b", "Constitutional Law (Article 21/32 PIL - Urban Slum Sanitation & Open Defecation)"),
             
-            # Banking & Commercial Recovery
+            # Banking, Tax & Commercial Recovery
             (r"\b(personal guarantee|director of a company in his personal capacity as guarantor|guarantor for a ₹?.*loan|guarantee is unenforceable because the bank altered the loan terms|guarantee deed contains a clause permitting variations)\b", "Commercial Banking & Contract Law (Recovery Suit Against Personal Guarantor / DRT)"),
             (r"\b(corporate insolvency resolution process|corporate resolution \(ibc 2016\)|committee of creditors|resolution plans)\b", "Insolvency and Bankruptcy Code, 2016 (IBC - Corporate Insolvency)"),
+            (r"\b(income tax|unexplained cash deposits|assessing officer|unaccounted cash|assessee|section 68.*income tax|section 69.*income tax|tax evasion.*mens rea)\b", "Direct Taxes / Income Tax Act, 1961 (Unexplained Cash Assessment u/s 68/69A)"),
+            (r"\b(gst — input tax credit fraud|input tax credit|gstn portal|gstr-1|gst act|shell entities.*input tax credit|itc of ₹)\b", "Indirect Taxes / Central Goods and Services Tax Act, 2017 (Input Tax Credit Audit)"),
             
             # Intellectual Property
             (r"\b(patent infringement|patent for a drug formulation|generic manufacturer launched a product with an identical active compound|crystalline form not covered by the patent|crystalline structure is distinct)\b", "Intellectual Property Law (Patents Act, 1970 - Pharmaceutical Patent Infringement)"),
             (r"\b(trademark passing off|passing off|trademark infringement|unfair competition|trade dress|deceptive color schemes|registered trademark|phonetically distinct|unregistered trade dress|red-and-white chequered interior design)\b", "Intellectual Property Law (Trade Marks Act, 1999)"),
             (r"\b(copyright infringement|copied the source code|structural similarity in code)\b", "Intellectual Property Law (Copyright Act, 1957)"),
             (r"\b(trademark dispute|registered trademark.*suprafit|phonetically distinct|market surveys showed consumer confusion)\b", "Intellectual Property Law (Trade Marks Act, 1999)"),
+            (r"\b(geographical indication|banarasi silk|gi tag|gi registration|gi holders)\b", "Geographical Indications of Goods Act, 1999 (GI Tag Infringement)"),
+            (r"\b(design infringement|registered industrial design|designs act|functional features cannot be protected as designs|aesthetic curvature is non-functional)\b", "Designs Act, 2000 (Industrial Design Infringement Action)"),
             
             # Motor Accident Claims
             (r"\b(motor accident — permanent disability|bus that jumped a footpath.*amputation of his left leg|returned to work with a prosthetic limb|loss of earning capacity, pain, and future medical expenses)\b", "Motor Vehicles Act, 1988 (MACT Permanent Disability & Amputation Claim)"),
             (r"\b(motor accident — uninsured vehicle|killed by a tractor that had no valid insurance|solatium fund|motor accident claims tribunal seeking compensation from the solatium fund)\b", "Motor Vehicles Act, 1988 (MACT Compensation / Solatium Fund Claim for Uninsured Vehicle)"),
             (r"\b(motor accident claim|daily wage labourer.*speeding truck|speeding truck.*claimants|mact|motor accident|claimants.*(?:sought|claim|filed)|fatal road accident.*claim)\b", "Motor Vehicles Act, 1988 (MACT Compensation Claim)"),
             (r"\b(contributory negligence.*car ran a red light|not wearing a helmet and was slightly over the speed limit)\b", "Motor Vehicles Act, 1988 (MACT Contributory Negligence Claim)"),
+            (r"\b(fake driving licence.*insurer|insurer refuses to pay compensation.*licence|pay and recover.*insurer|insurer must pay and later recover|mact.*fake licence)\b", "Motor Vehicles Act, 1988 (MACT Compensation & Insurer 'Pay and Recover' Liability)"),
+            (r"\b(motor accident — employer liability|delivery executive.*fatal accident|independent contractor, not an employee.*delivery|vicarious liability.*motor accident|delivery process in detail.*liability)\b", "Motor Vehicles Act, 1988 / Law of Torts (MACT Employer Vicarious Liability)"),
             
             # Arbitration & Commercial Contracts
             (r"\b(enforcement of foreign award|singapore-seated arbitral tribunal|section 48 of the arbitration act|violates indian public policy.*payment in foreign currency|procedural requirements of the new york convention)\b", "Arbitration and Conciliation Act, 1996 (Part II, Section 48 - Enforcement of Foreign Arbitral Award)"),
             (r"\b(franchise agreement termination|franchisor terminated a franchise agreement|violations of brand standards documented over|unilateral termination clause on material breach)\b", "Commercial Contract Law (Specific Relief Act / Indian Contract Act - Franchise Termination Dispute)"),
             (r"\b((?:section|u/s)\s+34.*arbitration|arbitration and conciliation act|set aside.*arbitral award|domestic arbitral award|arbitration section 34|challenge to arbitral award|sole arbitrator awarded|sole arbitrator)\b", "Arbitration Law (Arbitration and Conciliation Act, 1996 - Section 34 Challenge)"),
             (r"\b(purely civil commercial|commercial contract dispute|dispute arose between commercial business partners|invoice reconciliation.*no deceptive|commercial dispute — goods not delivered|force majeure clause requires notification|supply of industrial machinery.*advance|force majeure)\b", "Commercial Contract Law (Pure Commercial Contract Dispute)"),
+            (r"\b(disqualify an arbitrator|appointment of arbitrator|conflict of interest.*arbitrator|section 12.*arbitration|seventh schedule.*arbitration|ongoing commercial arbitration)\b", "Arbitration and Conciliation Act, 1996 (Section 12/14 Arbitrator Disqualification)"),
+            (r"\b(joint venture agreement|formed a joint venture|lock-in clause prohibiting withdrawal|jv agreement)\b", "Commercial Contract Law (Specific Relief Act - Joint Venture Agreement Dispute)"),
             
             # Environmental & Land Law
             (r"\b(forest land encroachment|suit for eviction of \d+ tribal families|scheduled tribes and other traditional forest dwellers|forest rights act, 2006|notified as reserved forest in \d+)\b", "Environmental & Forest Law (Scheduled Tribes & Forest Dwellers Act, 2006 / Reserved Forest Eviction)"),
             (r"\b(national green tribunal|ngt act|ngt\b|section 14.*national green tribunal|environmental application|polluting local water bodies|state pollution control board|untreated effluent|untreated industrial chemical|coastal regulation zone|crz notification|resort within 100 metres of the high tide line|crz-i area|coastal zone management authority|construction is within the prohibited zone)\b", "Environmental Law (National Green Tribunal Act, 2010 / Environment Protection Act)"),
+            (r"\b(gram sabha|forest rights act|community forest land|ministry of tribal affairs|mining lease.*gram sabha|tribal rights vs\. mining lease|revenue forest.*reserved forest)\b", "Environmental & Tribal Law (Forest Rights Act, 2006 / Gram Sabha Consent Dispute)"),
             
             # Additional Novel Non-Penal Regimes
             (r"\b(pmla|prevention of money laundering act|provisional attachment.*proceeds of crime|enforcement directorate.*attached|appellate tribunal for pmla)\b", "Prevention of Money Laundering Act, 2002 (PMLA Provisional Attachment)"),
@@ -187,9 +209,7 @@ class ScopedFactExtractor:
             (r"\b(carriage by air act|delayed international flight.*lost baggage|montreal convention.*baggage compensation)\b", "Carriage by Air Act, 1972 (Aviation Baggage & Flight Delay Compensation)"),
             (r"\b(section 94 ibc|personal insolvency.*individual debtor|debt resolution process.*insolvent debtor)\b", "Insolvency and Bankruptcy Code, 2016 (Personal Insolvency Resolution)"),
             (r"\b(court martial|summary general court martial|dismissal from army service.*aft|court-martial proceedings challenged)\b", "Armed Forces Tribunal Act, 2007 (Court Martial Conviction Appeal)"),
-            (r"\b(wildlife\s*(?:\(protection\)\s*)?act|biological specimens|chief wildlife warden|schedule i.*species|poaching|forest department.*seized)\b", "Wildlife Protection Act, 1972 (Wildlife Conservation Offence)"),
             (r"\b(section 66a it act|shreya singhal|struck down as unconstitutional.*66a|quashing of fir registered under section 66a)\b", "Information Technology Act, 2000 (Section 66A Void / Unconstitutional Quashing)"),
-            (r"\b(geographical indications|gi tag infringement|geographical indications of goods act|unauthorized use of darjeeling)\b", "Geographical Indications of Goods Act, 1999 (GI Infringement)"),
             (r"\b(pvpfra|plant varieties and farmers' rights|registered crop variety infringement|seed certification dispute)\b", "Protection of Plant Varieties and Farmers' Rights Act, 2001 (PVPFRA Dispute)"),
             (r"\b(sarfaesi|securiti[sz]ation|debts recovery tribunal|drt\b|section 17.*sarfaesi|possession notice.*auction)\b", "SARFAESI Act, 2002 (Section 17 Securitisation Application before DRT)"),
             (r"\b(revocation of project registration.*rera|diverted 70% of collections from escrow|rera section 7 revocation)\b", "Real Estate (Regulation and Development) Act, 2016 (Section 7 Registration Revocation)"),
@@ -290,6 +310,14 @@ class ScopedFactExtractor:
         is_stalking = False
         is_destruction_of_evidence = False
         is_counterfeit_currency = False
+        is_rioting = False
+        is_unlawful_assembly = False
+        is_wrongful_confinement = False
+        is_stolen_property_possession = False
+        is_cheating_personation = False
+        is_cruelty_to_animals = False
+        is_uapa_offence = False
+        is_wildlife_poaching = False
 
         accused_count = 1
         has_common_intention = False
@@ -355,7 +383,8 @@ class ScopedFactExtractor:
         has_kill_word = bool(re.search(r"\b(killed|killing|kills)\b", lower)) and not bool(re.search(r"\b(threaten\w* to kill|threat of killing|attempted to kill|intend\w* to kill)\b", lower))
         actual_death_patterns = ((has_death_word or has_kill_word) and not is_idiomatic_dead and not is_negated_fatal and not is_natural_death) or (bool(re.search(r"\b(deceased)\b", lower)) and not is_prior_deceased_relative and not is_idiomatic_dead and not is_negated_fatal and not is_natural_death)
         
-        death_caused = actual_death_patterns and not victim_survived and not is_negated_fatal and not is_suicide_abetment
+        is_animal_death = bool(re.search(r"\b(dead\s+(?:birds?|chickens?|poultry|animals?|cattle|cows?|dogs?|cats?|fish)|killing\s+of\s+(?:animals?|wildlife|leopards?|tigers?)|skins?\s+and\s+claws?|freshly\s+processed\s+skins?)\b", lower))
+        death_caused = actual_death_patterns and not victim_survived and not is_negated_fatal and not is_suicide_abetment and not is_animal_death
 
         if death_caused:
             injury_severity = "Fatal"
@@ -367,7 +396,7 @@ class ScopedFactExtractor:
             has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid|cardiac surgery|bullet wound|emergency surgery|fired (?:a )?shot directly at)\b", lower)) and not is_threat_of_hurt and not has_negated_grievous)
 
             # Negations and threats of simple hurt / physical injuries
-            has_negated_simple = bool(re.search(r"\b(no\s+(?:physical\s+|bodily\s+)?injur\w*|without\s+(?:any\s+)?(?:physical\s+|bodily\s+)?injur\w*|did not cause\s+(?:any\s+)?(?:physical\s+|bodily\s+)?injur\w*|no\s+(?:physical\s+|bodily\s+)?hurt|without\s+(?:causing\s+)?(?:any\s+)?(?:hurt|harm)|uninjured|unhurt|no\s+physical\s+injury\s+occurred)\b", lower))
+            has_negated_simple = bool(re.search(r"\b(no\s+(?:physical\s+|bodily\s+)?injur\w*|without\s+(?:any\s+)?(?:physical\s+|bodily\s+)?injur\w*|did not cause\s+(?:any\s+)?[^.!?]*(?:physical\s+|bodily\s+)?injur\w*|no\s+(?:physical\s+|bodily\s+)?hurt|without\s+(?:causing\s+)?(?:any\s+)?(?:hurt|harm)|uninjured|unhurt|no\s+physical\s+injury\s+occurred)\b", lower))
             is_threat_of_simple = bool(re.search(r"\b(fear\s+of\s+(?:instant\s+|immediate\s+)?(?:injury|injuries|hurt|harm)|threat\s+of\s+(?:instant\s+|immediate\s+)?(?:injury|injuries|hurt|harm)|threaten\w*\s+with\s+(?:injury|injuries|hurt)|threaten\w*\s+to\s+(?:injure|hurt))\b", lower))
             has_simple = (bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut|cuts|cutting|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze|bleeding\w*|(?:sustained|inflicted|suffered|causing|caused)\s+(?:bodily\s+|minor\s+|physical\s+|bleeding\s+)?injur\w*|physical\s+injur\w*|bodily\s+injur\w*)\b", lower))
                           and not has_negated_simple and not is_threat_of_simple)
@@ -406,10 +435,10 @@ class ScopedFactExtractor:
             tokens.append("sudden_fight_heat_of_passion")
 
         is_provocation = bool(re.search(r"\b(grave and sudden provocation|exceeding (?:private defence|right of private defence)|excess of the right of private defence|provocation)\b", lower))
-        is_negligence = bool(re.search(r"\b(rash|negligent|criminal negligence|excessive speed|high speed|speed was well above the limit|speeding|struck (?:a )?pedestrian|hit (?:a )?pedestrian|vehicular accident|reckless driving|failing to exercise reasonable care|hit and run|traffic collision|careless driving|lost control while (?:overtaking|driving|turning)|lorry driver|truck driver|bus driver|motor vehicle)\b", lower))
+        is_negligence = bool(re.search(r"\b(rash|negligent|criminal negligence|excessive speed|high speed|speed was well above the limit|speeding|struck (?:a )?pedestrian|hit (?:a )?pedestrian|vehicular accident|reckless driving|failing to exercise reasonable care|hit and run|traffic collision|careless driving|lost control while (?:overtaking|driving|turning)|lorry driver|truck driver|bus driver|motor vehicle|drag racing|racing.*motorcycles?|racing.*(?:road|highway|street)|accelerating rapidly|veered onto (?:the )?(?:footpath|pavement|kerb)|loss of control)\b", lower))
 
         if death_caused:
-            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|pesticide|laced.*(?:coffee|tea|flask|drink|food)|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck|(?:blunt force |fatal |severe |serious )?injuries to the (?:skull|head|chest|heart|neck)|skull fracture|fractured (?:the )?skull|attacked.*injuries to.*(?:chest|heart|throat|neck|head))\b", lower))
+            lethal_vital_attack = bool(re.search(r"\b(potassium cyanide|cyanide|arsenic|poison|pesticide|laced.*(?:coffee|tea|flask|drink|food)|shot.*in the (?:chest|head)|stabbed.*in the (?:chest|heart|throat|neck)|slashed.*throat|ambushed.*stabbed|decapitat\w*|crushed.*skull|hacked.*neck|(?:blunt force |fatal |severe |serious )?injuries to the (?:skull|head|chest|heart|neck)|skull fracture|fractured (?:the )?skull|attacked.*injuries to.*(?:chest|heart|throat|neck|head)|fatally stabbing|stabbed to death)\b", lower))
             if (has_premeditation or lethal_vital_attack) and not is_sudden_fight and not is_provocation:
                 intention_to_cause_death = True
                 tokens.append("intention_to_cause_death")
@@ -577,7 +606,7 @@ class ScopedFactExtractor:
             defense_plea_false_implication = True
 
         pure_civil = bool(re.search(r"\b(invoices?.*(?:unpaid|due|dispute)|(?:unpaid|pending).*invoices?|arbitration|civil dispute|commercial (?:contract|lease|dealership|invoice|distributor)|purely civil commercial|dispute arose between commercial business partners|reconciliation of accounts|delayed (?:payment|shipment|deliverables)|reconciliation dispute|master service agreement|partnership deed|partnership|quality audit certification|service level agreement|downtime violating|tenancy lease agreement|lease agreement expired|tenant delayed vacating|rent reconciliation)\b", lower))
-        if (pure_civil or is_natural_death) and not weapon_used and not death_caused and injury_severity == "None":
+        if (pure_civil or is_natural_death) and not weapon_used and not death_caused and injury_severity == "None" and not is_wrongful_confinement:
             is_commercial_civil_dispute = True
             tokens.append("civil_commercial_dispute")
 
@@ -688,7 +717,7 @@ class ScopedFactExtractor:
             tokens.append("without_consent_of_guardian")
 
         # --- 23. Stalking (Section 354D IPC / Section 78 BNS) ---
-        stalking_match = bool(re.search(r"\b(section 354d\b|section 78 bns|stalking|stalked|persistently followed|monitored.*(?:internet|email|social media|electronic communications?)|followed.*despite.*disinterest|tracked.*movements.*against her will)\b", lower))
+        stalking_match = bool(re.search(r"\b(section 354d\b|section 78 bns|stalking|stalked|persistently followed|monitored.*(?:internet|email|social media|electronic communications?)|followed.*despite.*disinterest|tracked.*movements.*against her will|following her to her workplace|sending threatening messages|appearing outside her residence|declined (?:his|her)?\s*romantic advances|loitering outside)\b", lower))
         if stalking_match and not death_caused and not is_sexual_offence:
             is_stalking = True
             tokens.append("follows_a_woman_and_contacts_or_attempts_to_contact_to_foster_personal_interaction_despite_clear_disinterest")
@@ -708,6 +737,69 @@ class ScopedFactExtractor:
             is_counterfeit_currency = True
             tokens.append("counterfeiting_or_performing_any_part_of_process_of_counterfeiting_currency_notes_or_banknotes")
             tokens.append("knowing_or_having_reason_to_believe_to_be_counterfeit")
+
+        # --- 26. Rioting (Section 147 IPC / Section 191(2) BNS) ---
+        rioting_match = bool(re.search(r"\b(section 147\b|section 148\b|section 191\(2\)|section 191\(3\)|rioting|rioters?|attacked opposition party workers|damaging vehicles and injuring|ringleaders?.*rally|violent mob|unlawful assembly.*violence)\b", lower))
+        if rioting_match and not death_caused:
+            is_rioting = True
+            tokens.append("unlawful_assembly_five_plus")
+            tokens.append("force_or_violence_used_by_assembly")
+            tokens.append("prosecution_of_common_object")
+
+        # --- 27. Unlawful Assembly / Constructive Liability (Section 149 IPC / Section 190 BNS) ---
+        unlawful_assembly_match = bool(re.search(r"\b(section 149\b|section 190 bns|unlawful assembly|burned the crops|forty members.*assembled|assembled and burned|common object of the assembly|caste-based violence.*assembled)\b", lower))
+        if unlawful_assembly_match and not death_caused:
+            is_unlawful_assembly = True
+            tokens.append("unlawful_assembly_five_plus")
+            tokens.append("offence_committed_in_prosecution_of_common_object")
+            tokens.append("member_of_assembly_at_time_of_committing")
+
+        # --- 28. Wrongful Confinement (Section 343 IPC / Section 127(3) BNS) ---
+        wrongful_conf_match = bool(re.search(r"\b(section 343\b|section 342\b|section 127\(3\)|section 127\(2\)|wrongful confinement|wrongfully confin\w*|locked.*inside.*(?:premises|room|house)|bolting the.*door from outside|locked his tenant inside|confinement for 3 days|confinement for three days|confined for three or more days)\b", lower))
+        if wrongful_conf_match and not death_caused:
+            is_wrongful_confinement = True
+            tokens.append("wrongful_restraint_or_confinement")
+            tokens.append("confinement_preventing_proceeding_beyond_boundaries")
+            tokens.append("confinement_for_three_or_more_days")
+
+        # --- 29. Dishonestly Receiving / Possessing Stolen Property (Section 411 IPC / Section 317(2) BNS) ---
+        stolen_prop_match = bool(re.search(r"\b(section 411\b|section 317\(2\)|possession of stolen property|receiving stolen property|retaining stolen property|reported stolen.*possession|found in possession of.*stolen|imei records confirm.*stolen)\b", lower))
+        if stolen_prop_match and not death_caused:
+            is_stolen_property_possession = True
+            tokens.append("possession_of_stolen_property")
+            tokens.append("knowing_or_having_reason_to_believe_to_be_stolen")
+            tokens.append("dishonest_retention_or_receipt")
+
+        # --- 30. Cheating by Personation (Section 419 IPC / Section 319 BNS) ---
+        cheating_personation_match = bool(re.search(r"\b(section 419\b|section 319 bns|cheating by (?:impersonation|personation)|posing as (?:an? )?(?:ias|ips|police officer|cbi|judge|government officer|officer)|pretended to be.*officer|alias and forged credentials.*plot allotment|obtained.*allotment.*posing as)\b", lower))
+        if cheating_personation_match and not death_caused and not is_extortion:
+            is_cheating_personation = True
+            tokens.append("cheating_by_personation")
+            tokens.append("pretending_to_be_another_or_fictitious_person")
+            tokens.append("dishonest_inducement_or_obtaining_property")
+
+        # --- 31. Cruelty to Animals (Section 11 Prevention of Cruelty to Animals Act 1960) ---
+        cruelty_animals_match = bool(re.search(r"\b(section 11.*pca|prevention of cruelty to animals|cruelty to animals|poultry farm.*birds.*enclosures|unnecessary suffering.*animal|dead birds left among the living|animal welfare board)\b", lower))
+        if cruelty_animals_match:
+            is_cruelty_to_animals = True
+            tokens.append("cruelty_to_animals")
+            tokens.append("unnecessary_pain_or_suffering")
+            tokens.append("inadequate_space_ventilation_or_confinement")
+
+        # --- 32. UAPA / Membership of Banned Organisation (Section 10 UAPA) ---
+        uapa_match = bool(re.search(r"\b(section 10.*uapa|uapa\b|unlawful activities prevention act|membership of (?:a )?banned organ|banned left-wing organisation|member of an unlawful association)\b", lower))
+        if uapa_match and not death_caused:
+            is_uapa_offence = True
+            tokens.append("membership_of_banned_or_unlawful_association")
+            tokens.append("possession_of_propaganda_or_participation_in_meetings")
+
+        # --- 33. Wildlife Protection Act / Poaching (Section 51 Wildlife Protection Act 1972) ---
+        wildlife_match = bool(re.search(r"\b(section 51.*wildlife|wildlife protection act|poaching|tiger reserve.*(?:skins|claws|carcass)|leopard skins and claws|possession of leopard skins|hunting wild animal)\b", lower))
+        if wildlife_match:
+            is_wildlife_poaching = True
+            tokens.append("poaching_or_hunting_wild_animal")
+            tokens.append("possession_of_animal_skins_claws_or_trophies")
+            tokens.append("offence_in_tiger_reserve_or_sanctuary")
 
         return AtomicFacts(
             is_out_of_domain=False,
@@ -759,6 +851,14 @@ class ScopedFactExtractor:
             is_stalking=is_stalking,
             is_destruction_of_evidence=is_destruction_of_evidence,
             is_counterfeit_currency=is_counterfeit_currency,
+            is_rioting=is_rioting,
+            is_unlawful_assembly=is_unlawful_assembly,
+            is_wrongful_confinement=is_wrongful_confinement,
+            is_stolen_property_possession=is_stolen_property_possession,
+            is_cheating_personation=is_cheating_personation,
+            is_cruelty_to_animals=is_cruelty_to_animals,
+            is_uapa_offence=is_uapa_offence,
+            is_wildlife_poaching=is_wildlife_poaching,
             accused_count=accused_count,
             has_common_intention=has_common_intention,
             is_criminal_conspiracy=is_criminal_conspiracy,

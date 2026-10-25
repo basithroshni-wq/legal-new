@@ -67,6 +67,14 @@ class AtomicFacts(BaseModel):
     is_stalking: bool = False
     is_destruction_of_evidence: bool = False
     is_counterfeit_currency: bool = False
+    is_rioting: bool = False
+    is_unlawful_assembly: bool = False
+    is_wrongful_confinement: bool = False
+    is_stolen_property_possession: bool = False
+    is_cheating_personation: bool = False
+    is_cruelty_to_animals: bool = False
+    is_uapa_offence: bool = False
+    is_wildlife_poaching: bool = False
     
     # Parties & Procedure
     accused_count: int = 1

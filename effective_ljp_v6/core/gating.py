@@ -198,7 +198,7 @@ class RelevanceAndConfidenceGate:
                 rejection_reason = "Disqualified: Section 138 NI Act requires cheque dishonour."
 
             # Extortion
-            elif getattr(facts, "is_extortion", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_420_IPC", "STAT_406_IPC"):
+            elif getattr(facts, "is_extortion", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_420_IPC", "STAT_406_IPC", "STAT_419_IPC"):
                 is_disqualified = True
                 rejection_reason = "Disqualified: Putting in fear to extort property is governed by Section 384 Extortion."
 
@@ -314,6 +314,78 @@ class RelevanceAndConfidenceGate:
                 is_disqualified = True
                 rejection_reason = "Disqualified: Section 489A requires counterfeiting currency notes or banknotes."
 
+            # Rioting (Section 147)
+            elif getattr(facts, "is_rioting", False) and candidate.id in ("STAT_379_IPC", "STAT_420_IPC", "STAT_CIVIL_482"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Rioting and public violence is governed by Section 147 IPC / Section 191(2) BNS."
+
+            elif candidate.id == "STAT_147_IPC" and not getattr(facts, "is_rioting", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 147 requires force or violence used by unlawful assembly."
+
+            # Unlawful Assembly (Section 149)
+            elif getattr(facts, "is_unlawful_assembly", False) and candidate.id in ("STAT_379_IPC", "STAT_420_IPC", "STAT_CIVIL_482"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Constructive liability of unlawful assembly is governed by Section 149 IPC / Section 190 BNS."
+
+            elif candidate.id == "STAT_149_IPC" and not getattr(facts, "is_unlawful_assembly", False) and not getattr(facts, "is_rioting", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 149 requires offence committed in prosecution of common object by unlawful assembly."
+
+            # Wrongful Confinement (Section 343)
+            elif getattr(facts, "is_wrongful_confinement", False) and candidate.id in ("STAT_379_IPC", "STAT_420_IPC", "STAT_CIVIL_482", "STAT_506_IPC"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Wrongful confinement is specifically governed by Section 343 IPC / Section 127(3) BNS."
+
+            elif candidate.id == "STAT_343_IPC" and not getattr(facts, "is_wrongful_confinement", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 343 requires wrongful confinement for three or more days."
+
+            # Dishonestly Receiving Stolen Property (Section 411)
+            elif getattr(facts, "is_stolen_property_possession", False) and candidate.id in ("STAT_420_IPC", "STAT_406_IPC", "STAT_CIVIL_482"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Possession of stolen property is specifically governed by Section 411 IPC / Section 317(2) BNS."
+
+            elif candidate.id == "STAT_411_IPC" and not getattr(facts, "is_stolen_property_possession", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 411 requires dishonestly receiving or retaining stolen property."
+
+            # Cheating by Personation (Section 419)
+            elif getattr(facts, "is_cheating_personation", False) and candidate.id in ("STAT_379_IPC", "STAT_406_IPC", "STAT_CIVIL_482"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Cheating by personation is specifically governed by Section 419 IPC / Section 319 BNS."
+
+            elif candidate.id == "STAT_419_IPC" and not getattr(facts, "is_cheating_personation", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 419 requires cheating by personation."
+
+            # Cruelty to Animals (Section 11 PCA Act)
+            elif getattr(facts, "is_cruelty_to_animals", False) and candidate.id in ("STAT_302_IPC", "STAT_304_P1_IPC", "STAT_304_P2_IPC", "STAT_304A_IPC", "STAT_379_IPC", "STAT_CIVIL_482"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Cruelty to animals is governed by Section 11 PCA Act, not human homicide or civil dispute."
+
+            elif candidate.id == "STAT_PCA_11" and not getattr(facts, "is_cruelty_to_animals", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 11 PCA Act requires cruelty to animals."
+
+            # UAPA (Section 10 UAPA)
+            elif getattr(facts, "is_uapa_offence", False) and candidate.id in ("STAT_379_IPC", "STAT_420_IPC", "STAT_CIVIL_482"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Unlawful association membership is governed by Section 10 UAPA."
+
+            elif candidate.id == "STAT_UAPA_10" and not getattr(facts, "is_uapa_offence", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 10 UAPA requires membership of banned or unlawful association."
+
+            # Wildlife Protection Act (Section 51 Wildlife Protection Act)
+            elif getattr(facts, "is_wildlife_poaching", False) and candidate.id in ("STAT_302_IPC", "STAT_304_P1_IPC", "STAT_304_P2_IPC", "STAT_379_IPC", "STAT_CIVIL_482"):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Hunting/poaching of wild animals is governed by Section 51 Wildlife Protection Act."
+
+            elif candidate.id == "STAT_WPA_51" and not getattr(facts, "is_wildlife_poaching", False):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 51 Wildlife Protection Act requires poaching or trophy possession."
+
             # Domain-targeted protection: Do NOT noise filter candidates directly matched by extracted facts
             domain_protected = False
             if getattr(facts, "is_defamation", False) and candidate.id == "STAT_500_IPC":
@@ -402,6 +474,22 @@ class RelevanceAndConfidenceGate:
                 domain_protected = True
             elif getattr(facts, "is_counterfeit_currency", False) and candidate.id == "STAT_489A_IPC":
                 domain_protected = True
+            elif getattr(facts, "is_rioting", False) and candidate.id == "STAT_147_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_unlawful_assembly", False) and candidate.id == "STAT_149_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_wrongful_confinement", False) and candidate.id == "STAT_343_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_stolen_property_possession", False) and candidate.id == "STAT_411_IPC":
+                domain_protected = True
+            elif getattr(facts, "is_cheating_personation", False) and candidate.id in ("STAT_419_IPC", "STAT_468_IPC"):
+                domain_protected = True
+            elif getattr(facts, "is_cruelty_to_animals", False) and candidate.id == "STAT_PCA_11":
+                domain_protected = True
+            elif getattr(facts, "is_uapa_offence", False) and candidate.id == "STAT_UAPA_10":
+                domain_protected = True
+            elif getattr(facts, "is_wildlife_poaching", False) and candidate.id == "STAT_WPA_51":
+                domain_protected = True
 
             # Low relevance or insufficient ingredient fulfillment check
             if not is_disqualified and not domain_protected:
@@ -443,6 +531,22 @@ class RelevanceAndConfidenceGate:
             return getattr(facts, "is_destruction_of_evidence", False)
         if "counterfeit" in ing or "currency_note" in ing or "banknote" in ing:
             return getattr(facts, "is_counterfeit_currency", False)
+        if "rioting" in ing or "force_or_violence_used_by_assembly" in ing:
+            return getattr(facts, "is_rioting", False)
+        if "unlawful_assembly" in ing or "member_of_assembly" in ing or "prosecution_of_common_object" in ing:
+            return getattr(facts, "is_unlawful_assembly", False) or getattr(facts, "is_rioting", False)
+        if "wrongful_restraint_or_confinement" in ing or "confinement_preventing" in ing or "confinement_for_three_or_more_days" in ing:
+            return getattr(facts, "is_wrongful_confinement", False)
+        if "possession_of_stolen_property" in ing or "reason_to_believe_to_be_stolen" in ing or "dishonest_retention" in ing:
+            return getattr(facts, "is_stolen_property_possession", False)
+        if "cheating_by_personation" in ing or "pretending_to_be_another" in ing or "personation" in ing:
+            return getattr(facts, "is_cheating_personation", False)
+        if "cruelty_to_animals" in ing or "unnecessary_pain_or_suffering" in ing or "inadequate_space" in ing:
+            return getattr(facts, "is_cruelty_to_animals", False)
+        if "membership_of_banned" in ing or "unlawful_association" in ing or "propaganda" in ing:
+            return getattr(facts, "is_uapa_offence", False)
+        if "poaching" in ing or "animal_skins_claws" in ing or "tiger_reserve" in ing or "wildlife" in ing:
+            return getattr(facts, "is_wildlife_poaching", False)
 
         if "suicide" in ing or "abetment" in ing or "instigation" in ing:
             return getattr(facts, "is_suicide_abetment", False)
