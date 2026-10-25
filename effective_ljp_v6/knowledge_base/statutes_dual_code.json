@@ -436,6 +436,27 @@
     "legal_definition": "Whoever commits criminal trespass shall be punished with imprisonment of either description for a term which may extend to three months, or with fine which may extend to five hundred rupees, or with both under Section 447 IPC / Section 329(3) BNS."
   },
   {
+    "id": "STAT_448_IPC",
+    "ipc_section": "Section 448",
+    "bns_section": "Section 329(4)",
+    "statute_title": "Punishment for House-Trespass",
+    "charge_category": "Criminal Trespass & Intimidation",
+    "statutory_ceiling_tier": "Tier 1 (Up to 3 Years)",
+    "statutory_max_years": 1,
+    "statutory_min_years": 0,
+    "is_cognizable": true,
+    "is_bailable": true,
+    "essential_ingredients": [
+      "unlawful_entry_into_or_upon_property",
+      "building_tent_or_vessel_used_as_human_dwelling",
+      "intent_to_commit_offence_or_intimidate_or_annoy"
+    ],
+    "negative_exceptions": [
+      "authorized_lawful_entry"
+    ],
+    "legal_definition": "Whoever commits house-trespass by entering into or remaining in any building, tent or vessel used as a human dwelling with intent to commit an offence or to intimidate, insult or annoy, shall be punished with imprisonment for a term which may extend to one year, or with fine up to one thousand rupees (Section 448 IPC) / five thousand rupees (Section 329(4) BNS), or with both."
+  },
+  {
     "id": "STAT_CIVIL_482",
     "ipc_section": "Quashed u/s 482 CrPC",
     "bns_section": "Section 528 BNSS",

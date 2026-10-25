@@ -46,6 +46,7 @@ class AtomicFacts(BaseModel):
     is_sexual_harassment: bool = False
     is_intimidation: bool = False
     is_criminal_trespass: bool = False
+    is_house_trespass: bool = False
     is_defamation: bool = False
     is_housebreaking: bool = False
     is_theft_in_dwelling: bool = False

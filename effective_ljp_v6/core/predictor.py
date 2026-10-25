@@ -85,10 +85,8 @@ class CalibratedLegalPredictor:
             if facts.is_intimidation and cand.id == "STAT_506_IPC" and not facts.is_robbery and not facts.is_sexual_offence and not facts.death_caused and not getattr(facts, "is_criminal_trespass", False):
                 z += 0.60
 
-            if getattr(facts, "is_criminal_trespass", False):
-                if cand.id == "STAT_447_IPC":
-                    z += 1.50
-                elif cand.id == "STAT_506_IPC":
+            if getattr(facts, "is_criminal_trespass", False) or getattr(facts, "is_house_trespass", False):
+                if cand.id == "STAT_506_IPC":
                     z -= 0.60
 
             if facts.is_dacoity:
@@ -152,6 +150,17 @@ class CalibratedLegalPredictor:
                 else:
                     z -= 0.80
 
+            if getattr(facts, "is_house_trespass", False):
+                if cand.id == "STAT_448_IPC":
+                    z += 2.50
+                elif cand.id == "STAT_447_IPC":
+                    z += 0.80
+            elif getattr(facts, "is_criminal_trespass", False):
+                if cand.id == "STAT_447_IPC":
+                    z += 2.00
+                elif cand.id == "STAT_448_IPC":
+                    z += 0.80
+
             if getattr(facts, "is_housebreaking", False) and cand.id == "STAT_457_IPC":
                 z += 1.20
 
@@ -210,9 +219,9 @@ class CalibratedLegalPredictor:
 
             if getattr(facts, "is_cyber_phishing", False):
                 if cand.id == "STAT_IT_66D":
-                    z += 1.80
+                    z += 2.50
                 else:
-                    z -= 0.80
+                    z -= 1.00
 
             if getattr(facts, "is_hate_speech_153a", False):
                 if cand.id == "STAT_153A_IPC":

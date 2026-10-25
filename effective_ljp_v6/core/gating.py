@@ -166,6 +166,14 @@ class RelevanceAndConfidenceGate:
                 is_disqualified = True
                 rejection_reason = "Disqualified: Section 447 requires criminal trespass into property."
 
+            elif candidate.id == "STAT_448_IPC" and (not getattr(facts, "is_house_trespass", False) and not getattr(facts, "is_criminal_trespass", False)):
+                is_disqualified = True
+                rejection_reason = "Disqualified: Section 448 requires house trespass into human dwelling."
+
+            elif (getattr(facts, "is_breach_of_trust", False) or getattr(facts, "is_breach_of_trust_clerk_servant", False) or getattr(facts, "is_cbt_public_servant_banker", False)) and candidate.id == "STAT_CIVIL_482":
+                is_disqualified = True
+                rejection_reason = "Disqualified: Dishonest misappropriation or conversion of entrusted property constitutes criminal breach of trust, not a quashable civil dispute."
+
             elif candidate.id == "STAT_498A_IPC" and (not facts.is_matrimonial or not any(k in facts.extracted_tokens for k in ("matrimonial_cruelty_498a", "dowry_death_304b", "suicide_abetment_306"))):
                 is_disqualified = True
                 rejection_reason = "Disqualified: Section 498A strictly requires harassment or cruelty towards a woman in matrimonial context."
@@ -225,7 +233,7 @@ class RelevanceAndConfidenceGate:
                 rejection_reason = "Disqualified: Section 364A requires kidnapping or abduction for ransom."
 
             # Cyber Phishing / Personation
-            elif getattr(facts, "is_cyber_phishing", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_406_IPC", "STAT_419_IPC", "STAT_420_IPC"):
+            elif getattr(facts, "is_cyber_phishing", False) and candidate.id in ("STAT_379_IPC", "STAT_392_IPC", "STAT_406_IPC", "STAT_419_IPC", "STAT_420_IPC", "STAT_471_IPC", "STAT_468_IPC"):
                 is_disqualified = True
                 rejection_reason = "Disqualified: Cheating by personation using computer resource is governed by Section 66D IT Act."
 
@@ -408,7 +416,9 @@ class RelevanceAndConfidenceGate:
                 domain_protected = True
             elif facts.is_intimidation and candidate.id == "STAT_506_IPC":
                 domain_protected = True
-            elif getattr(facts, "is_criminal_trespass", False) and candidate.id == "STAT_447_IPC":
+            elif getattr(facts, "is_house_trespass", False) and candidate.id in ("STAT_448_IPC", "STAT_447_IPC"):
+                domain_protected = True
+            elif getattr(facts, "is_criminal_trespass", False) and candidate.id in ("STAT_447_IPC", "STAT_448_IPC"):
                 domain_protected = True
             elif getattr(facts, "is_breach_of_trust_clerk_servant", False) and candidate.id == "STAT_408_IPC":
                 domain_protected = True
@@ -596,7 +606,9 @@ class RelevanceAndConfidenceGate:
         if "intimidation" in ing or "threat" in ing or "alarm" in ing or "compel" in ing:
             return facts.is_intimidation
         if "trespass" in ing or "unlawful_entry" in ing:
-            return getattr(facts, "is_criminal_trespass", False)
+            return getattr(facts, "is_criminal_trespass", False) or getattr(facts, "is_house_trespass", False)
+        if "building_tent_or_vessel" in ing or "human_dwelling" in ing:
+            return getattr(facts, "is_house_trespass", False) or getattr(facts, "is_theft_in_dwelling", False) or getattr(facts, "is_housebreaking", False)
         if "civil" in ing or "commercial" in ing:
             return facts.is_commercial_civil_dispute
         if "several_persons" in ing or "common_intention" in ing:
