@@ -102,8 +102,7 @@ class ScopedFactExtractor:
         nature_matches = sum(1 for w in nature_words if w in lower)
         corp_matches = sum(1 for phrase in corporate_finance if phrase in lower)
 
-        # Check explicit non-penal civil / constitutional / family / labour / commercial / administrative litigation first
-        has_active_crime = bool(re.search(r"\b(charged with (?:murder|rape|theft|robbery|dacoity|cheating|forgery|kidnapping)|kidnapp\w*|fir registered|fir lodged|chargesheet|arrested for (?:murder|rape|theft|robbery|dacoity|kidnapping)|criminal complaint alleging (?:cheating|breach)|penal code|bns 2023|ipc 1860|indian penal code)\b", lower))
+        has_active_crime = bool(re.search(r"\b(charged with (?:murder|rape|theft|robbery|dacoity|cheating|forgery|kidnapping)|kidnapp\w*|fir registered|fir lodged|chargesheet|arrested for (?:murder|rape|theft|robbery|dacoity|kidnapping)|criminal complaint alleging (?:cheating|breach)|quash\w*|section 482\b|section 528 bnss|penal code|bns 2023|ipc 1860|indian penal code)\b", lower))
         
         non_penal_domains = [
             # Contract & Property Law
@@ -141,8 +140,8 @@ class ScopedFactExtractor:
             (r"\b(insurance claim repudiat\w*|repudiat\w*.*(?:insurance|claim|policy)|insurer repudiated|damaged in a flood.*insurance claim|private vehicle policy)\b", "Consumer Protection Act, 2019 (Insurance Repudiation Dispute)"),
             (r"\b(medical negligence|routine appendectomy.*surgical sponge|surgical count record)\b", "Consumer Protection Act, 2019 (Medical Negligence Complaint)"),
             (r"\b(employee'?s? compensation|workm[ae]n'?s? compensation|commissioner for workmen|machine crush injury|industrial.*compensation|lost.*fingers.*machine)\b", "Labour Law (Employees' Compensation Act, 1923)"),
-            (r"\b(unfair labour practice|wrongful termination|permanent employee.*restructuring.*domestic inquiry)\b", "Labour Law (Industrial Disputes Act, 1947)"),
-            (r"\b(e-commerce defective product|refrigerator online.*stopped working|warranty card guaranteed)\b", "Consumer Protection Act, 2019 (Defective Goods Complaint)"),
+            (r"\b(industrial disputes? act|labour court|industrial tribunal|unfair labour practice|wrongful termination|reinstatement with full back wages|trade union challenged|permanent employee.*restructuring.*domestic inquiry)\b", "Labour Law (Industrial Disputes Act, 1947)"),
+            (r"\b(consumer commission|district consumer|consumer protection act|e-commerce defective product|defective goods|defective electronics|defective product|refrigerator online.*stopped working|warranty card guaranteed)\b", "Consumer Protection Act, 2019 (Defective Goods Complaint)"),
             
             # Constitutional & Public Law
             (r"\b(aadhaar linkage|mandating aadhaar linkage for receiving pension|biometric authentication failures|right to privacy under article 21.*aadhaar)\b", "Constitutional Law (Article 226/32 Writ - Aadhaar Linkage & Privacy under Art. 21)"),
@@ -464,7 +463,7 @@ class ScopedFactExtractor:
             is_robbery = True
             force_or_violence_used = True
             tokens.append("robbery_committed")
-            if injury_severity in ("Simple", "Grievous") or bool(re.search(r"\b(robbery with hurt|struck.*causing.*injur|stabbed.*robbed|hurt.*robbery|knife causing bleeding|slashed.*knife)\b", lower)):
+            if injury_severity in ("Simple", "Grievous") or bool(re.search(r"\b(robbery with hurt|struck.*causing.*injur|stabbed.*robbed|voluntarily caus\w* hurt|knife causing bleeding|slashed.*knife)\b", lower)):
                 is_robbery_with_hurt = True
                 tokens.append("voluntarily_causing_hurt")
         elif (stole_property or is_theft_in_dwelling) and not force_exerted and not weapon_used and not is_trespass:
@@ -577,7 +576,7 @@ class ScopedFactExtractor:
         if re.search(r"\b(falsely implicated|claims innocence|fabricated case by police|pleads false implication)\b", lower):
             defense_plea_false_implication = True
 
-        pure_civil = bool(re.search(r"\b(invoices?.*(?:unpaid|due|dispute)|(?:unpaid|pending).*invoices?|arbitration|civil dispute|commercial (?:contract|lease|dealership|invoice|distributor)|reconciliation of accounts|delayed (?:payment|shipment|deliverables)|reconciliation dispute|master service agreement|partnership deed|quality audit certification|service level agreement|downtime violating|tenancy lease agreement|lease agreement expired|tenant delayed vacating|rent reconciliation)\b", lower))
+        pure_civil = bool(re.search(r"\b(invoices?.*(?:unpaid|due|dispute)|(?:unpaid|pending).*invoices?|arbitration|civil dispute|commercial (?:contract|lease|dealership|invoice|distributor)|purely civil commercial|dispute arose between commercial business partners|reconciliation of accounts|delayed (?:payment|shipment|deliverables)|reconciliation dispute|master service agreement|partnership deed|partnership|quality audit certification|service level agreement|downtime violating|tenancy lease agreement|lease agreement expired|tenant delayed vacating|rent reconciliation)\b", lower))
         if (pure_civil or is_natural_death) and not weapon_used and not death_caused and injury_severity == "None":
             is_commercial_civil_dispute = True
             tokens.append("civil_commercial_dispute")
