@@ -261,13 +261,13 @@ def build_app(pipeline: EffectiveLjpPipeline = None):
 
         return articles_html, charge_html, penalty_html, ratio_html, audit_html
 
-    with gr.Blocks(title="Effective LJP V6 | Indian Penal Jurisprudence AI", css=CUSTOM_CSS, theme=gr.themes.Base()) as demo:
+    with gr.Blocks(title="LegalBERT + NeMo-LM + Qwen-7B | Indian Penal Jurisprudence AI", css=CUSTOM_CSS, theme=gr.themes.Base()) as demo:
         gr.HTML("""
         <div style='text-align: center; padding: 24px 0 16px 0;'>
-            <h1 style='font-size: 2.4rem; margin-bottom: 8px;'>⚖️ Effective LJP V6: Neuro-Symbolic Legal AI</h1>
+            <h1 style='font-size: 2.4rem; margin-bottom: 8px;'>⚖️ LegalBERT + NeMo-LM + Qwen-7B: Legal AI</h1>
             <p style='color: #94a3b8; font-size: 1.1rem; max-width: 800px; margin: 0 auto;'>
-                Dual-Code Indian Penal Jurisprudence (IPC 1860 & BNS 2023) with Pydantic-Scoped Extraction,
-                Hybrid BM25 + Dense Retrieval, Calibrated Softmax Prediction, and Symbolic CrPC 31 / BNSS 25 Guardrails.
+                Dual-Code Indian Penal Jurisprudence (IPC 1860 & BNS 2023) with LegalBERT Representation,
+                NeMo-LM Semantic Retrieval, Qwen-7B Legal Reasoning, and Symbolic CrPC 31 / BNSS 25 Guardrails.
             </p>
         </div>
         """)

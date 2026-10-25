@@ -1384,9 +1384,9 @@ def launch_ui(share: bool = False, port: int = 7860):
         """
         return card1, charges_str, card2, ratio_str
 
-    with gr.Blocks(title="Effective LJP V6 Standalone") as demo:
-        gr.HTML("<h1 style='text-align: center; color: #ffffff; margin-top: 10px;'>⚖️ Effective LJP V6 (Standalone)</h1>")
-        gr.HTML("<p style='text-align: center; color: #94a3b8; margin-bottom: 20px;'>Self-Contained Neuro-Symbolic Legal AI for Indian Penal Jurisprudence (IPC & BNS)</p>")
+    with gr.Blocks(title="LegalBERT + NeMo-LM + Qwen-7B Legal AI") as demo:
+        gr.HTML("<h1 style='text-align: center; color: #ffffff; margin-top: 10px;'>⚖️ LegalBERT + NeMo-LM + Qwen-7B: Legal AI</h1>")
+        gr.HTML("<p style='text-align: center; color: #94a3b8; margin-bottom: 20px;'>Dual-Code Indian Penal Jurisprudence (IPC & BNS) with LegalBERT Encodings, NeMo-LM Semantic Retrieval, Qwen-7B Reasoning, and CrPC § 31 Guardrails</p>")
 
         with gr.Row():
             with gr.Column():
