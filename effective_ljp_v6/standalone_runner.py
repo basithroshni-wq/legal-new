@@ -601,7 +601,11 @@ class ScopedFactExtractor:
             is_threat_of_hurt = bool(re.search(r"\b(threaten\w* to|threats? of)\b[^.!?]*\b(teeth|fracture|smash|break)\b", lower))
             has_negated_grievous = bool(re.search(r"\b(without (?:any )?(?:bone involvement|fracture|grievous|danger to life|permanent disfigurement|harm)|no (?:fracture|grievous|danger to life)|or grievous injury)\b", lower))
             has_grievous = (bool(re.search(r"\b(fractur\w*|broken (?:legs?|bones?|ribs?)|breaking both legs|grievous|internal bleeding|stabbed in (?:chest|abdomen|stomach|left thoracic|thoracic)|permanent privation|vital organ|severed|thoracic|penetrated|blind\w*|loss of vision|disfigurement|chemical burns|deep second and third degree burns|destroying.*skin|necrosis|permanent disability|permanent stiffness|shattering|mandible|teeth|patella|visceral shock|pour\w* acid)\b", lower)) and not is_threat_of_hurt and not has_negated_grievous)
-            has_simple = bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut\w*|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze)\b", lower))
+
+            has_negated_simple = bool(re.search(r"\b(no\s+(?:physical\s+|bodily\s+)?injur\w*|without\s+(?:any\s+)?(?:physical\s+|bodily\s+)?injur\w*|did not cause\s+(?:any\s+)?(?:physical\s+|bodily\s+)?injur\w*|no\s+(?:physical\s+|bodily\s+)?hurt|without\s+(?:causing\s+)?(?:any\s+)?(?:hurt|harm)|uninjured|unhurt|no\s+physical\s+injury\s+occurred)\b", lower))
+            is_threat_of_simple = bool(re.search(r"\b(fear\s+of\s+(?:instant\s+|immediate\s+)?(?:injury|injuries|hurt|harm)|threat\s+of\s+(?:instant\s+|immediate\s+)?(?:injury|injuries|hurt|harm)|threaten\w*\s+with\s+(?:injury|injuries|hurt)|threaten\w*\s+to\s+(?:injure|hurt))\b", lower))
+            has_simple = (bool(re.search(r"\b(simple hurt|bruise\w*|scratch\w*|minor injury|slapped|punched|swelling|superficial|slash\w*|tenderness|black eye|nosebleed|contusions?|redness|cut\w*|laceration\w*|wound\w*|punctur\w*|bodily pain|temporary bodily pain|pain|kicked|scalds|graze|(?:sustained|inflicted|suffered|causing|caused)\s+(?:bodily\s+|minor\s+|physical\s+|bleeding\s+)?injur\w*|physical\s+injur\w*|bodily\s+injur\w*)\b", lower))
+                          and not has_negated_simple and not is_threat_of_simple)
 
             if has_grievous:
                 injury_severity = "Grievous"
