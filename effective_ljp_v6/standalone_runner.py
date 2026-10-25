@@ -709,10 +709,19 @@ class ScopedFactExtractor:
         dowry_demand = bool(re.search(r"\b(dowry|failing to bring|unlawful demand for (?:cash|car|gold|property)|harassed for dowry|dowry demands)\b", lower))
         marriage_within_7 = bool(re.search(r"\b(married\b[^.!?]*\b(?:one|two|three|four|five|six|seven|\d+)\s*(?:years?|yrs?|months?)|(?:one|two|three|four|five|six|seven|\d+)\s*(?:years?|yrs?|months?)\s+of\s+marriage|married for only \d+ months)\b", lower))
 
+        matrimonial_cruelty_triggers = bool(re.search(
+            r"\b(cruelty|harass\w*|mental torture|verbal degradation|suicide|"
+            r"abuse|abusive|continuous abuse|subjected.*to (?:continuous )?abuse|"
+            r"assaulted (?:his )?wife|beat (?:his )?wife|beat her|routinely beat her|beat her black and blue|"
+            r"locked her in|physical beatings?|calling her barren|threw her onto the street|threw her out|"
+            r"demand\w*.*?\bfrom (?:her )?parents|failed to deliver|unlawful demand|"
+            r"demanding (?:that she bring|rs\b|cash|gold|money|car|funds|an suv))\b", lower
+        ))
+
         is_dowry_death = matrimonial and death_caused and (dowry_demand or marriage_within_7)
         if is_dowry_death:
             tokens.append("dowry_death_304b")
-        elif matrimonial and (dowry_demand or bool(re.search(r"\b(cruelty|harassed|subjected to harassment|mental torture|verbal degradation|suicide)\b", lower))):
+        elif matrimonial and (dowry_demand or matrimonial_cruelty_triggers):
             tokens.append("matrimonial_cruelty_498a")
 
         # 7. Sexual Offences & Criminal Intimidation

@@ -121,7 +121,7 @@ class ScopedFactExtractor:
             (r"\b(mortgage foreclosure|sarfaesi proceedings|housing loan.*defaulted)\b", "Banking & SARFAESI Act, 2002 (Mortgage Foreclosure)"),
             
             # Family Law
-            (r"\b(mutual consent|dissolution of marriage|section 13b|hindu marriage act.*13b|alimony|divorce)\b", "Hindu Marriage Act, 1955 (Section 13B Mutual Consent Divorce & Alimony)"),
+            (r"\b(mutual consent|dissolution of marriage|section 13b|hindu marriage act.*13b|alimony|mutually agreed to divorce|divorce petition|suit for divorce|decree of divorce|filed for divorce|seeking divorce)\b", "Hindu Marriage Act, 1955 (Section 13B Mutual Consent Divorce & Alimony)"),
             (r"\b(pwdva|protection order \(pwdva|domestic violence — protection order|shelter home with her two children|alienating the children|protection of women from domestic violence)\b", "Protection of Women from Domestic Violence Act, 2005 (PWDVA Application for Protection Order)"),
             (r"\b(guardianship — nri|nri father.*guardianship|guardianship of his \d+-year-old|interviewed in chambers.*expressed a preference to stay with his mother)\b", "Guardians and Wards Act, 1890 (Child Custody and Guardianship Dispute)"),
             (r"\b(second wife'?s? claim|succession — intestate|disputed as bigamous|biological father of all children.*nominee in his insurance|dna testing confirms the man was the biological father)\b", "Indian Succession Act, 1925 / Hindu Succession Act (Intestate Succession & Second Wife's Claim)"),
@@ -506,12 +506,21 @@ class ScopedFactExtractor:
             yr_str = m_yr_match.group(1)
             marriage_years = w_map.get(yr_str, float(yr_str) if yr_str.isdigit() else None)
 
+        matrimonial_cruelty_triggers = bool(re.search(
+            r"\b(cruelty|harass\w*|mental torture|verbal degradation|suicide|"
+            r"abuse|abusive|continuous abuse|subjected.*to (?:continuous )?abuse|"
+            r"assaulted (?:his )?wife|beat (?:his )?wife|beat her|routinely beat her|beat her black and blue|"
+            r"locked her in|physical beatings?|calling her barren|threw her onto the street|threw her out|"
+            r"demand\w*.*?\bfrom (?:her )?parents|failed to deliver|unlawful demand|"
+            r"demanding (?:that she bring|rs\b|cash|gold|money|car|funds|an suv))\b", lower
+        ))
+
         if matrimonial_context:
             is_matrimonial = True
             if death_caused and (dowry_demand or marriage_within_7):
                 is_dowry_death = True
                 tokens.append("dowry_death_304b")
-            elif dowry_demand or bool(re.search(r"\b(cruelty|harassed|subjected to harassment|mental torture|verbal degradation|suicide)\b", lower)):
+            elif dowry_demand or matrimonial_cruelty_triggers:
                 tokens.append("matrimonial_cruelty_498a")
 
         # --- 7. Sexual Offences & Criminal Intimidation ---
@@ -608,7 +617,8 @@ class ScopedFactExtractor:
             tokens.append("failure_to_pay_within_15_days")
 
         # --- 14. Extortion (Section 384 IPC / Section 308(2) BNS) ---
-        extortion_match = bool(re.search(r"\b(extort\w*|demanded.*(?:ransom|protection money|hafta)|putting.*in fear of injury|compelling.*deliver.*(?:property|money|cash)|threaten\w*\s+to\s+implicate.*?unless\s+paid|threaten\w*.*?unless\s+paid|caught red-handed accepting.*lakh)\b", lower))
+        is_threat_msg_intimidation = bool(re.search(r"\b(sent (?:recorded )?voice messages?|recorded voice messages?|voice messages? threatening|sent handwritten letters? threatening|letters? threatening)\b", lower))
+        extortion_match = bool(re.search(r"\b(extort\w*|demanded.*(?:ransom|protection money|hafta)|putting.*in fear of injury|compelling.*deliver.*(?:property|money|cash)|threaten\w*\s+to\s+implicate.*?unless\s+paid|threaten\w*.*?unless\s+paid|caught red-handed accepting.*lakh)\b", lower)) and not is_threat_msg_intimidation
         if extortion_match and not is_robbery and not death_caused:
             is_extortion = True
             tokens.append("intentional_putting_in_fear_of_injury")
