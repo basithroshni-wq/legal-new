@@ -1,4 +1,4 @@
-# ⚖️ LegalBERT + NeMo-LM + Qwen-7B: Neuro-Symbolic Legal AI
+# ⚖️ Dynamic Legal Judgement Prediction: Neuro-Symbolic Legal AI
 ### Dual-Code Indian Penal Jurisprudence (IPC 1860 & BNS 2023)
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)

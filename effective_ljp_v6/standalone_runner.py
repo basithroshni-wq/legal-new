@@ -21,6 +21,7 @@ import math
 import copy
 import json
 import html
+import base64
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass, field
 
@@ -1384,9 +1385,22 @@ def launch_ui(share: bool = False, port: int = 7860):
         """
         return card1, charges_str, card2, ratio_str
 
-    with gr.Blocks(title="LegalBERT + NeMo-LM + Qwen-7B Legal AI") as demo:
-        gr.HTML("<h1 style='text-align: center; color: #ffffff; margin-top: 10px;'>⚖️ LegalBERT + NeMo-LM + Qwen-7B: Legal AI</h1>")
-        gr.HTML("<p style='text-align: center; color: #94a3b8; margin-bottom: 20px;'>Dual-Code Indian Penal Jurisprudence (IPC & BNS) with LegalBERT Encodings, NeMo-LM Semantic Retrieval, Qwen-7B Reasoning, and CrPC § 31 Guardrails</p>")
+    def get_b64(fname):
+        base_d = os.path.dirname(os.path.abspath(__file__))
+        p = os.path.join(base_d, "assets", fname)
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                return f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
+        return ""
+
+    acc_b64 = get_b64("accuracy_eval.png")
+    prec_b64 = get_b64("precision_eval.png")
+    f1_b64 = get_b64("macro_f1_eval.png")
+    pr_rec_b64 = get_b64("precision_vs_recall_eval.png")
+
+    with gr.Blocks(title="Dynamic Legal Judgement Prediction") as demo:
+        gr.HTML("<h1 style='text-align: center; color: #ffffff; margin-top: 10px;'>⚖️ Dynamic Legal Judgement Prediction</h1>")
+        gr.HTML("<p style='text-align: center; color: #94a3b8; margin-bottom: 20px;'>Dual-Code Indian Penal Jurisprudence (IPC & BNS) with Empirical Neuro-Symbolic Verification</p>")
 
         with gr.Row():
             with gr.Column():
@@ -1399,6 +1413,55 @@ def launch_ui(share: bool = False, port: int = 7860):
                 out4 = gr.HTML(label="Ratio Decidendi")
 
         btn.click(adjudicate, inputs=[inp], outputs=[out1, out2, out3, out4])
+
+        gr.HTML("""
+        <div style='margin-top: 36px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;'>
+            <h2 style='font-size: 1.8rem; margin: 0 0 6px 0; color: #ffffff;'>📊 Empirical Performance Evaluation</h2>
+            <p style='color: #94a3b8; font-size: 0.95rem; margin-bottom: 20px;'>
+                Comparative ablation benchmarks across successive model architectures on Indian Penal jurisprudence
+            </p>
+        </div>
+        """)
+
+        with gr.Row():
+            with gr.Column():
+                gr.HTML(f"""
+                <div style='background: #1e293b; border-radius: 12px; padding: 14px;'>
+                    <h4 style='color: #ffffff; margin: 0 0 10px 0;'>🎯 Accuracy (%) &mdash; Peak 84%</h4>
+                    <div style='background: #ffffff; border-radius: 8px; padding: 10px; text-align: center;'>
+                        <img src='{acc_b64}' style='width: 100%; max-height: 350px; object-fit: contain;'/>
+                    </div>
+                </div>
+                """)
+            with gr.Column():
+                gr.HTML(f"""
+                <div style='background: #1e293b; border-radius: 12px; padding: 14px;'>
+                    <h4 style='color: #ffffff; margin: 0 0 10px 0;'>⚖️ Precision (%) &mdash; Peak 89%</h4>
+                    <div style='background: #ffffff; border-radius: 8px; padding: 10px; text-align: center;'>
+                        <img src='{prec_b64}' style='width: 100%; max-height: 350px; object-fit: contain;'/>
+                    </div>
+                </div>
+                """)
+
+        with gr.Row():
+            with gr.Column():
+                gr.HTML(f"""
+                <div style='background: #1e293b; border-radius: 12px; padding: 14px;'>
+                    <h4 style='color: #ffffff; margin: 0 0 10px 0;'>📐 Macro-F1 (%) &mdash; Peak 80%</h4>
+                    <div style='background: #ffffff; border-radius: 8px; padding: 10px; text-align: center;'>
+                        <img src='{f1_b64}' style='width: 100%; max-height: 350px; object-fit: contain;'/>
+                    </div>
+                </div>
+                """)
+            with gr.Column():
+                gr.HTML(f"""
+                <div style='background: #1e293b; border-radius: 12px; padding: 14px;'>
+                    <h4 style='color: #ffffff; margin: 0 0 10px 0;'>⚖️ Precision vs Recall (%) &mdash; P: 89% / R: 82%</h4>
+                    <div style='background: #ffffff; border-radius: 8px; padding: 10px; text-align: center;'>
+                        <img src='{pr_rec_b64}' style='width: 100%; max-height: 350px; object-fit: contain;'/>
+                    </div>
+                </div>
+                """)
 
     demo.launch(server_name="127.0.0.1", server_port=port, share=share)
 

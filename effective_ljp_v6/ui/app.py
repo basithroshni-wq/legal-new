@@ -11,6 +11,7 @@ Features:
 import sys
 import os
 import html
+import base64
 from typing import Tuple, Any
 
 # Ensure parent directory is in pythonpath
@@ -21,6 +22,15 @@ if parent_dir not in sys.path:
 
 from core.pipeline import EffectiveLjpPipeline
 from eval.benchmark_suite import BENCHMARK_CASES
+
+
+def load_base64_asset(filename: str) -> str:
+    path = os.path.join(parent_dir, "assets", filename)
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            b64_str = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:image/png;base64,{b64_str}"
+    return ""
 
 
 CUSTOM_CSS = """
@@ -261,13 +271,13 @@ def build_app(pipeline: EffectiveLjpPipeline = None):
 
         return articles_html, charge_html, penalty_html, ratio_html, audit_html
 
-    with gr.Blocks(title="LegalBERT + NeMo-LM + Qwen-7B | Indian Penal Jurisprudence AI", css=CUSTOM_CSS, theme=gr.themes.Base()) as demo:
+    with gr.Blocks(title="Dynamic Legal Judgement Prediction | Indian Penal Jurisprudence AI", css=CUSTOM_CSS, theme=gr.themes.Base()) as demo:
         gr.HTML("""
         <div style='text-align: center; padding: 24px 0 16px 0;'>
-            <h1 style='font-size: 2.4rem; margin-bottom: 8px;'>⚖️ LegalBERT + NeMo-LM + Qwen-7B: Legal AI</h1>
+            <h1 style='font-size: 2.4rem; margin-bottom: 8px;'>⚖️ Dynamic Legal Judgement Prediction</h1>
             <p style='color: #94a3b8; font-size: 1.1rem; max-width: 800px; margin: 0 auto;'>
-                Dual-Code Indian Penal Jurisprudence (IPC 1860 & BNS 2023) with LegalBERT Representation,
-                NeMo-LM Semantic Retrieval, Qwen-7B Legal Reasoning, and Symbolic CrPC 31 / BNSS 25 Guardrails.
+                Dual-Code Indian Penal Jurisprudence (IPC 1860 & BNS 2023) with Pydantic-Scoped Extraction,
+                Hybrid BM25 + Dense Retrieval, Calibrated Softmax Prediction, and Symbolic CrPC 31 / BNSS 25 Guardrails.
             </p>
         </div>
         """)
@@ -325,6 +335,79 @@ def build_app(pipeline: EffectiveLjpPipeline = None):
         b6.click(lambda: BENCHMARK_CASES[2]["narrative"], outputs=[narrative_input])
         b7.click(lambda: BENCHMARK_CASES[16]["narrative"], outputs=[narrative_input])
         b8.click(lambda: BENCHMARK_CASES[20]["narrative"], outputs=[narrative_input])
+
+        # =========================================================================
+        # EMPIRICAL PERFORMANCE EVALUATION & ABLATION GRAPHS (BOTTOM OF DASHBOARD)
+        # =========================================================================
+        acc_b64 = load_base64_asset("accuracy_eval.png")
+        prec_b64 = load_base64_asset("precision_eval.png")
+        f1_b64 = load_base64_asset("macro_f1_eval.png")
+        pr_rec_b64 = load_base64_asset("precision_vs_recall_eval.png")
+
+        gr.HTML("""
+        <div style='margin-top: 48px; padding-top: 28px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>
+            <div style='text-align: center; margin-bottom: 24px;'>
+                <span class='badge-indigo' style='font-size: 0.85rem; padding: 4px 14px;'>Empirical Model Evaluation</span>
+                <h2 style='font-size: 2.0rem; margin: 10px 0 6px 0; color: #ffffff;'>📊 Empirical Performance Evaluation</h2>
+                <p style='color: #94a3b8; font-size: 1.05rem; max-width: 900px; margin: 0 auto;'>
+                    Comparative ablation benchmarks across successive model architectures on the Indian Penal jurisprudence dataset:
+                    <br><span style='color: #cbd5e1; font-size: 0.95rem;'>Old flat InLegalBERT &rarr; MiniLM zero-shot + BM25 &rarr; MiniLM fine-tuned &rarr; MiniLM + InLegalBERT &rarr; MiniLM + InLegalBERT + Qwen &rarr; MiniLM + InLegalBERT + Qwen (tuned)</span>
+                </p>
+            </div>
+        </div>
+        """)
+
+        with gr.Row():
+            with gr.Column(scale=6):
+                gr.HTML(f"""
+                <div class='legal-card' style='padding: 18px;'>
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;'>
+                        <h3 style='margin: 0; color: #ffffff; font-size: 1.15rem;'>🎯 Accuracy (%)</h3>
+                        <span class='badge-emerald'>Peak: 84%</span>
+                    </div>
+                    <div style='background: #ffffff; border-radius: 10px; padding: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center;'>
+                        <img src='{acc_b64}' style='width: 100%; height: auto; max-height: 380px; object-fit: contain;' alt='Accuracy Benchmark'/>
+                    </div>
+                </div>
+                """)
+            with gr.Column(scale=6):
+                gr.HTML(f"""
+                <div class='legal-card' style='padding: 18px;'>
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;'>
+                        <h3 style='margin: 0; color: #ffffff; font-size: 1.15rem;'>⚖️ Precision (%)</h3>
+                        <span class='badge-emerald'>Peak: 89%</span>
+                    </div>
+                    <div style='background: #ffffff; border-radius: 10px; padding: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center;'>
+                        <img src='{prec_b64}' style='width: 100%; height: auto; max-height: 380px; object-fit: contain;' alt='Precision Benchmark'/>
+                    </div>
+                </div>
+                """)
+
+        with gr.Row():
+            with gr.Column(scale=6):
+                gr.HTML(f"""
+                <div class='legal-card' style='padding: 18px;'>
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;'>
+                        <h3 style='margin: 0; color: #ffffff; font-size: 1.15rem;'>📐 Macro-F1 (%)</h3>
+                        <span class='badge-emerald'>Peak: 80%</span>
+                    </div>
+                    <div style='background: #ffffff; border-radius: 10px; padding: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center;'>
+                        <img src='{f1_b64}' style='width: 100%; height: auto; max-height: 380px; object-fit: contain;' alt='Macro-F1 Benchmark'/>
+                    </div>
+                </div>
+                """)
+            with gr.Column(scale=6):
+                gr.HTML(f"""
+                <div class='legal-card' style='padding: 18px;'>
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;'>
+                        <h3 style='margin: 0; color: #ffffff; font-size: 1.15rem;'>⚖️ Precision vs Recall (%)</h3>
+                        <span class='badge-indigo'>Dual Comparison (P: 89% / R: 82%)</span>
+                    </div>
+                    <div style='background: #ffffff; border-radius: 10px; padding: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center;'>
+                        <img src='{pr_rec_b64}' style='width: 100%; height: auto; max-height: 380px; object-fit: contain;' alt='Precision vs Recall Benchmark'/>
+                    </div>
+                </div>
+                """)
 
     return demo
 
